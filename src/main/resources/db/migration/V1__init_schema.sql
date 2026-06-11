@@ -9,6 +9,10 @@
 -- Auth token tables added in V2__auth_schema.sql.
 -- =============================================================
 
+-- gen_random_uuid() is a core function from PostgreSQL 13+.
+-- pgcrypto enabled defensively for compatibility with older environments.
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
 
 -- =============================================================
 -- CLINIC (TENANT ROOT)
@@ -138,9 +142,9 @@ CREATE TABLE patient_profiles (
     date_of_birth         DATE,
     preferred_pharmacy_id UUID        REFERENCES pharmacies(id),
     -- [{name, severity}]
-    allergies             JSONB       NOT NULL DEFAULT '[]',
+    allergies             JSONB       NOT NULL DEFAULT '[]'::jsonb,
     -- [{name, dose, frequency}]
-    current_medications   JSONB       NOT NULL DEFAULT '[]',
+    current_medications   JSONB       NOT NULL DEFAULT '[]'::jsonb,
     created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -299,7 +303,7 @@ CREATE TABLE prescriptions (
     refills                  INTEGER      NOT NULL DEFAULT 0,
     instructions             TEXT,
     -- {interactions: [], allergyFlags: [], doseWarnings: []}
-    ai_safety_checks         JSONB        NOT NULL DEFAULT '{}',
+    ai_safety_checks         JSONB        NOT NULL DEFAULT '{}'::jsonb,
     status                   VARCHAR(50)  NOT NULL DEFAULT 'DRAFT'
                                  CHECK (status IN ('DRAFT','SIGNED','SENT_ELECTRONIC','SENT_PDF','FILLED','CANCELLED')),
     delivery_method          VARCHAR(50)
@@ -354,7 +358,7 @@ CREATE TABLE diagnostic_requisitions (
     patient_id            UUID         NOT NULL REFERENCES users(id),
     ordering_physician_id UUID         NOT NULL REFERENCES users(id),
     test_type             VARCHAR(100) NOT NULL,
-    test_codes            JSONB        NOT NULL DEFAULT '[]',
+    test_codes            JSONB        NOT NULL DEFAULT '[]'::jsonb,
     clinical_indication   TEXT,
     urgency               VARCHAR(20)  NOT NULL DEFAULT 'ROUTINE'
                               CHECK (urgency IN ('ROUTINE','URGENT','STAT')),

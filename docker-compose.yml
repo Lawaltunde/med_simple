@@ -1,20 +1,7 @@
 services:
-  product-service:
-    container_name: medsimple
-    build:
-      context: .
-      dockerfile: Dockerfile
-    environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/medsimple
-      SPRING_DATASOURCE_USERNAME: medsimple
-      SPRING_DATASOURCE_PASSWORD: password
-    ports:
-      - "8090:8080"
-    networks:
-      - hammedlawal
   db:
     container_name: medsimple-db
-    image: postgres
+    image: postgres:16-alpine
     environment:
       POSTGRES_USER: medsimple
       POSTGRES_PASSWORD: password
@@ -23,7 +10,7 @@ services:
       - "5333:5432"
     restart: unless-stopped
     volumes:
-      - db:/data/postgres
+      - medsimple_db:/var/lib/postgresql/data
     networks:
       - hammedlawal
 
@@ -32,4 +19,4 @@ networks:
     driver: bridge
 
 volumes:
-  db:
+  medsimple_db:

@@ -14,13 +14,15 @@ public class FlywayConfig {
     private String[] locations;
 
     // Spring Boot 4.x removed Flyway auto-configuration.
-    // initMethod = "migrate" ensures migrations run before the JPA
-    // EntityManagerFactory validates the schema.
-    @Bean(initMethod = "migrate")
+    // migrate() is called eagerly inside the bean method so it completes
+    // before any other bean that depends on DataSource (including JPA) can run.
+    @Bean
     public Flyway flyway(DataSource dataSource) {
-        return Flyway.configure()
+        Flyway flyway = Flyway.configure()
                 .dataSource(dataSource)
                 .locations(locations)
                 .load();
+        flyway.migrate();
+        return flyway;
     }
 }
