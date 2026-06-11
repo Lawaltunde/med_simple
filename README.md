@@ -190,15 +190,15 @@ src/
 docker-compose up -d
 ```
 
-The `docker-compose.yml` should define a PostgreSQL 16 service on port `5432` with database `medsimple`.
+This starts `medsimple-db` (PostgreSQL 16) mapped to host port `5333`.
 
-**2. Configure the application:**
+**2. Set environment variables:**
 
 ```bash
-cp src/main/resources/application-example.properties src/main/resources/application-local.properties
+export DB_URL=jdbc:postgresql://localhost:5333/medsimple
+export DB_USERNAME=medsimple
+export DB_PASSWORD=password
 ```
-
-Edit `application-local.properties` with your local database credentials.
 
 **3. Run the application:**
 
