@@ -12,10 +12,10 @@ services:
     volumes:
       - medsimple_db:/var/lib/postgresql/data
     networks:
-      - hammedlawal
+      - medsimple-network
 
 networks:
-  hammedlawal:
+  medsimple-network:
     driver: bridge
 
 volumes:

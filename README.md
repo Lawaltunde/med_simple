@@ -232,7 +232,7 @@ Flyway manages all schema changes. Files live in `src/main/resources/db/migratio
 
 Migrations apply automatically at startup. **Never modify a committed migration** — always add a new versioned file.
 
-Spring JPA is configured with `ddl-auto=validate`. Flyway is the only source of truth for schema state.
+Spring JPA is configured with `ddl-auto=none`. Flyway is the sole owner of schema state — Hibernate never creates or validates tables.
 
 ### Tables
 
