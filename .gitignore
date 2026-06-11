@@ -37,3 +37,7 @@ build/
 ### project docs
 MedSimple-Proof-of-Concept.docx
 CLAUDE.md
+
+### Testcontainers local overrides — never commit machine-specific docker.host paths
+testcontainers.properties
+src/test/resources/testcontainers.properties
