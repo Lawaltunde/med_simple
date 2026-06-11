@@ -205,7 +205,7 @@ export DB_PASSWORD=password
 Flyway migrations apply automatically on startup.
 
 ```bash
-./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+./mvnw spring-boot:run
 ```
 
 ### Build and Test
