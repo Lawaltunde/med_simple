@@ -1,0 +1,22 @@
+services:
+  db:
+    container_name: medsimple-db
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: medsimple
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: medsimple
+    ports:
+      - "5333:5432"
+    restart: unless-stopped
+    volumes:
+      - medsimple_db:/var/lib/postgresql/data
+    networks:
+      - medsimple-network
+
+networks:
+  medsimple-network:
+    driver: bridge
+
+volumes:
+  medsimple_db:
