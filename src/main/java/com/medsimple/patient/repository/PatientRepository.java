@@ -5,6 +5,7 @@ import com.medsimple.shared.entity.UserRole;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -12,6 +13,8 @@ import java.util.UUID;
 public interface PatientRepository extends JpaRepository<User, UUID> {
 
     Optional<User> findByIdAndRole(UUID id, UserRole role);
+
+    List<User> findAllByRole(UserRole role);
 
     boolean existsByEmail(String email);
 }
