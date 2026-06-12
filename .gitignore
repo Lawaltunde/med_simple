@@ -38,6 +38,10 @@ build/
 MedSimple-Proof-of-Concept.docx
 CLAUDE.md
 
+### Local dev overrides — contain plaintext dev credentials, never commit
+application-local.properties
+src/main/resources/application-local.properties
+
 ### Testcontainers local overrides — never commit machine-specific docker.host paths
 testcontainers.properties
 src/test/resources/testcontainers.properties
