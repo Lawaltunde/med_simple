@@ -1,5 +1,7 @@
 package com.medsimple.config;
 
+import com.medsimple.clinic.exception.ClinicNotFoundException;
+import com.medsimple.clinic.exception.StaffAlreadyExistsException;
 import com.medsimple.patient.exception.EmailAlreadyInUseException;
 import com.medsimple.patient.exception.PatientAlreadyRegisteredException;
 import com.medsimple.patient.exception.PatientNotFoundException;
@@ -20,13 +22,13 @@ public class GlobalExceptionHandler {
 
     record ApiError(int status, String error, String message, Instant timestamp) {}
 
-    @ExceptionHandler(PatientNotFoundException.class)
-    public ResponseEntity<ApiError> handlePatientNotFound(PatientNotFoundException ex) {
+    @ExceptionHandler({PatientNotFoundException.class, ClinicNotFoundException.class})
+    public ResponseEntity<ApiError> handleNotFound(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ApiError(404, "NOT_FOUND", ex.getMessage(), Instant.now()));
     }
 
-    @ExceptionHandler({PatientAlreadyRegisteredException.class, EmailAlreadyInUseException.class})
+    @ExceptionHandler({PatientAlreadyRegisteredException.class, EmailAlreadyInUseException.class, StaffAlreadyExistsException.class})
     public ResponseEntity<ApiError> handleConflict(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ApiError(409, "CONFLICT", ex.getMessage(), Instant.now()));
