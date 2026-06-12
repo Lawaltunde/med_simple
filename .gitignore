@@ -45,3 +45,6 @@ src/main/resources/application-local.properties
 ### Testcontainers local overrides — never commit machine-specific docker.host paths
 testcontainers.properties
 src/test/resources/testcontainers.properties
+### Local API test file — not part of the deliverable
+requests.http
+patients.http
