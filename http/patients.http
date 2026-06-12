@@ -1,0 +1,161 @@
+### MedSimple — Patient API
+### Base URL — change port if needed
+@baseUrl = http://localhost:8080/api/v1
+
+### ──────────────────────────────────────────────────
+### 1. Create a patient
+### ──────────────────────────────────────────────────
+# @name createPatient
+POST {{baseUrl}}/patients
+Content-Type: application/json
+
+{
+  "email": "jane.doe@example.com",
+  "password": "securePass123",
+  "firstName": "Jane",
+  "lastName": "Doe",
+  "phone": "416-555-0100",
+  "dateOfBirth": "1990-04-15"
+}
+
+### ──────────────────────────────────────────────────
+### 2. Get patient by ID
+###    Replace the UUID below with the id from step 1
+### ──────────────────────────────────────────────────
+@patientId = {{createPatient.response.body.$.id}}
+
+GET {{baseUrl}}/patients/{{patientId}}
+
+### ──────────────────────────────────────────────────
+### 3. Update patient profile (allergies, medications)
+### ──────────────────────────────────────────────────
+PATCH {{baseUrl}}/patients/{{patientId}}/profile
+Content-Type: application/json
+
+{
+  "dateOfBirth": "1990-04-15",
+  "allergies": [
+    { "name": "Penicillin", "severity": "HIGH" },
+    { "name": "Peanuts", "severity": "MODERATE" }
+  ],
+  "currentMedications": [
+    { "name": "Metformin", "dose": "500mg", "frequency": "twice daily" }
+  ]
+}
+
+### ──────────────────────────────────────────────────
+### 4. Add provincial health coverage (OHIP)
+### ──────────────────────────────────────────────────
+# @name addCoverage
+POST {{baseUrl}}/patients/{{patientId}}/coverage
+Content-Type: application/json
+
+{
+  "coverageType": "PROVINCIAL",
+  "providerName": "Ontario OHIP",
+  "cardNumber": "1234567890AB",
+  "province": "ON",
+  "expiryDate": "2027-12-31",
+  "primary": true
+}
+
+### ──────────────────────────────────────────────────
+### 5. Add private insurance
+### ──────────────────────────────────────────────────
+POST {{baseUrl}}/patients/{{patientId}}/coverage
+Content-Type: application/json
+
+{
+  "coverageType": "PRIVATE",
+  "providerName": "Sun Life Financial",
+  "cardNumber": "SL-9876543",
+  "primary": false
+}
+
+### ──────────────────────────────────────────────────
+### 6. List all active coverage for a patient
+### ──────────────────────────────────────────────────
+GET {{baseUrl}}/patients/{{patientId}}/coverage
+
+### ──────────────────────────────────────────────────
+### 7. Deactivate a coverage record
+###    Replace coverageId with the id from step 4
+### ──────────────────────────────────────────────────
+@coverageId = {{addCoverage.response.body.$.id}}
+
+DELETE {{baseUrl}}/patients/{{patientId}}/coverage/{{coverageId}}
+
+### ──────────────────────────────────────────────────
+### 8. Register patient to a clinic
+###    (requires a clinic row in the DB — insert manually or
+###     wait for the clinic module PR)
+### ──────────────────────────────────────────────────
+POST {{baseUrl}}/patients/{{patientId}}/registrations
+Content-Type: application/json
+
+{
+  "clinicId": "00000000-0000-0000-0000-000000000001"
+}
+
+### ──────────────────────────────────────────────────
+### 9. List clinic registrations
+### ──────────────────────────────────────────────────
+GET {{baseUrl}}/patients/{{patientId}}/registrations
+
+### ──────────────────────────────────────────────────
+### 10. Record a consent event (DATA_PROCESSING)
+### ──────────────────────────────────────────────────
+# @name recordConsent
+POST {{baseUrl}}/patients/{{patientId}}/consents
+Content-Type: application/json
+
+{
+  "consentType": "DATA_PROCESSING",
+  "version": "v1.0",
+  "grantedAt": "2026-06-12T00:00:00Z"
+}
+
+### ──────────────────────────────────────────────────
+### 11. Record consent revocation
+### ──────────────────────────────────────────────────
+POST {{baseUrl}}/patients/{{patientId}}/consents
+Content-Type: application/json
+
+{
+  "consentType": "MARKETING",
+  "version": "v1.0",
+  "revokedAt": "2026-06-12T00:00:00Z"
+}
+
+### ──────────────────────────────────────────────────
+### 12. Get full consent history
+### ──────────────────────────────────────────────────
+GET {{baseUrl}}/patients/{{patientId}}/consents
+
+### ──────────────────────────────────────────────────
+### Error cases — validation
+### ──────────────────────────────────────────────────
+
+### Missing email → 400
+POST {{baseUrl}}/patients
+Content-Type: application/json
+
+{
+  "password": "securePass123",
+  "firstName": "Test",
+  "lastName": "User"
+}
+
+### Duplicate email → 409
+POST {{baseUrl}}/patients
+Content-Type: application/json
+
+{
+  "email": "jane.doe@example.com",
+  "password": "securePass123",
+  "firstName": "Jane",
+  "lastName": "Doe"
+}
+
+### Patient not found → 404
+GET {{baseUrl}}/patients/00000000-0000-0000-0000-000000000000
