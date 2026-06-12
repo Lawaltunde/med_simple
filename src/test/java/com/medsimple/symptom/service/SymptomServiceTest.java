@@ -33,6 +33,7 @@ class SymptomServiceTest {
     @Mock SymptomEpisodeRepository episodeRepository;
     @Mock SymptomSubmissionRepository submissionRepository;
     @Mock PatientRepository patientRepository;
+    @Mock com.medsimple.patient.repository.PatientClinicRegistrationRepository registrationRepository;
     @Mock AuditService auditService;
     @Mock EntityManager entityManager;
 
@@ -71,6 +72,8 @@ class SymptomServiceTest {
     @Test
     void startEpisode_noClinic_createsSubmittedEpisode() {
         when(patientRepository.findByIdAndRole(patientId, UserRole.PATIENT)).thenReturn(Optional.of(patient));
+        // No active registration -> episode stays unrouted (assignedClinic null).
+        when(registrationRepository.findByPatientId(patientId)).thenReturn(List.of());
         when(episodeRepository.save(any())).thenReturn(sampleEpisode);
 
         EpisodeResponse response = symptomService.startEpisode(patientId, new StartEpisodeRequest(null), "127.0.0.1");

@@ -2,7 +2,9 @@ package com.medsimple.symptom.service;
 
 import com.medsimple.audit.service.AuditService;
 import com.medsimple.clinic.entity.Clinic;
+import com.medsimple.patient.entity.PatientClinicRegistration;
 import com.medsimple.patient.exception.PatientNotFoundException;
+import com.medsimple.patient.repository.PatientClinicRegistrationRepository;
 import com.medsimple.patient.repository.PatientRepository;
 import com.medsimple.shared.entity.User;
 import com.medsimple.shared.entity.UserRole;
@@ -26,6 +28,7 @@ public class SymptomService {
     private final SymptomEpisodeRepository episodeRepository;
     private final SymptomSubmissionRepository submissionRepository;
     private final PatientRepository patientRepository;
+    private final PatientClinicRegistrationRepository registrationRepository;
     private final AuditService auditService;
     private final EntityManager entityManager;
 
@@ -36,8 +39,18 @@ public class SymptomService {
 
         SymptomEpisode.SymptomEpisodeBuilder builder = SymptomEpisode.builder().patient(patient);
 
-        if (request.clinicId() != null) {
-            builder.assignedClinic(entityManager.getReference(Clinic.class, request.clinicId()));
+        // Routing: use the explicit clinicId if given, otherwise auto-route to the
+        // patient's active clinic registration so the episode lands in a physician queue.
+        UUID targetClinicId = request.clinicId();
+        if (targetClinicId == null) {
+            targetClinicId = registrationRepository.findByPatientId(patientId).stream()
+                    .filter(PatientClinicRegistration::isActive)
+                    .map(reg -> reg.getClinic().getId())
+                    .findFirst()
+                    .orElse(null);
+        }
+        if (targetClinicId != null) {
+            builder.assignedClinic(entityManager.getReference(Clinic.class, targetClinicId));
         }
 
         SymptomEpisode saved = episodeRepository.save(builder.build());
