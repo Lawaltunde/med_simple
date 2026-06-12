@@ -8,7 +8,6 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-// Stub entity — clinic module PR will flesh out the full implementation.
 @Entity
 @Table(name = "clinics")
 @Getter
@@ -25,8 +24,25 @@ public class Clinic {
     @Column(nullable = false)
     private String name;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String type;
+    private ClinicType type;
+
+    @Column(name = "address_line1")
+    private String addressLine1;
+
+    @Column(name = "address_line2")
+    private String addressLine2;
+
+    private String city;
+    private String province;
+
+    @Column(name = "postal_code")
+    private String postalCode;
+
+    private String phone;
+    private String fax;
+    private String email;
 
     @Column(nullable = false)
     @Builder.Default
