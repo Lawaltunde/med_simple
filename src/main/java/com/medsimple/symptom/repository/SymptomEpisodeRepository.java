@@ -15,4 +15,8 @@ public interface SymptomEpisodeRepository extends JpaRepository<SymptomEpisode, 
 
     List<SymptomEpisode> findByAssignedClinicIdAndStatusInOrderByCreatedAtDesc(
             UUID clinicId, List<EpisodeStatus> statuses);
+
+    // Physician queue source — sorting by clinical urgency happens in the service
+    // (PhysicianQueueService) where the comparator is deterministic and unit-testable.
+    List<SymptomEpisode> findByAssignedClinicIdAndStatusIn(UUID clinicId, List<EpisodeStatus> statuses);
 }
