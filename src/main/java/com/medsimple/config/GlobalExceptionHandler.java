@@ -1,5 +1,6 @@
 package com.medsimple.config;
 
+import com.medsimple.careplan.exception.CarePlanNotFoundException;
 import com.medsimple.clinic.exception.ClinicNotFoundException;
 import com.medsimple.clinic.exception.StaffAlreadyExistsException;
 import com.medsimple.symptom.exception.EpisodeNotFoundException;
@@ -23,7 +24,7 @@ public class GlobalExceptionHandler {
 
     record ApiError(int status, String error, String message, Instant timestamp) {}
 
-    @ExceptionHandler({PatientNotFoundException.class, ClinicNotFoundException.class, EpisodeNotFoundException.class})
+    @ExceptionHandler({PatientNotFoundException.class, ClinicNotFoundException.class, EpisodeNotFoundException.class, CarePlanNotFoundException.class})
     public ResponseEntity<ApiError> handleNotFound(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ApiError(404, "NOT_FOUND", ex.getMessage(), Instant.now()));
