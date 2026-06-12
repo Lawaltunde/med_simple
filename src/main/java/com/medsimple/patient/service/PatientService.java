@@ -62,6 +62,16 @@ public class PatientService {
     }
 
     @Transactional(readOnly = true)
+    public List<PatientResponse> getAllPatients() {
+        return patientRepository.findAllByRole(UserRole.PATIENT).stream()
+                .map(user -> {
+                    PatientProfile profile = patientProfileRepository.findByUserId(user.getId()).orElseThrow();
+                    return toResponse(user, profile);
+                })
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public PatientResponse getPatient(UUID id) {
         User user = findPatientById(id);
         PatientProfile profile = patientProfileRepository.findByUserId(id).orElseThrow();

@@ -38,7 +38,7 @@ public class PatientConsent {
     @Column(name = "revoked_at")
     private OffsetDateTime revokedAt;
 
-    @Column(name = "ip_address", columnDefinition = "inet")
+    @Column(name = "ip_address")
     private String ipAddress;
 
     @CreationTimestamp

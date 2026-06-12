@@ -26,6 +26,11 @@ public class PatientController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    @GetMapping
+    public ResponseEntity<List<PatientResponse>> getAllPatients() {
+        return ResponseEntity.ok(patientService.getAllPatients());
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<PatientResponse> getPatient(@PathVariable UUID id) {
         return ResponseEntity.ok(patientService.getPatient(id));

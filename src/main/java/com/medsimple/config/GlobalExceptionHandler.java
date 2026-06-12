@@ -3,15 +3,18 @@ package com.medsimple.config;
 import com.medsimple.patient.exception.EmailAlreadyInUseException;
 import com.medsimple.patient.exception.PatientAlreadyRegisteredException;
 import com.medsimple.patient.exception.PatientNotFoundException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.time.Instant;
 import java.util.stream.Collectors;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -38,8 +41,16 @@ public class GlobalExceptionHandler {
                 .body(new ApiError(400, "VALIDATION_ERROR", message, Instant.now()));
     }
 
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
+        String message = "Invalid value for parameter '" + ex.getName() + "': " + ex.getValue();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ApiError(400, "BAD_REQUEST", message, Instant.now()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleUnexpected(Exception ex) {
+        log.error("Unhandled exception", ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ApiError(500, "INTERNAL_ERROR", "An unexpected error occurred", Instant.now()));
     }

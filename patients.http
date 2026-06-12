@@ -1,16 +1,16 @@
 ### MedSimple — Patient API
-### Base URL — change port if needed
-@baseUrl = http://localhost:8080/api/v1
+@baseUrl = http://127.0.0.1:8080/api/v1
 
 ### ──────────────────────────────────────────────────
 ### 1. Create a patient
+###    Run this first — the response handler saves
+###    patientId into the client session automatically.
 ### ──────────────────────────────────────────────────
-# @name createPatient
 POST {{baseUrl}}/patients
 Content-Type: application/json
 
 {
-  "email": "jane.doe@example.com",
+  "email": "lawal.doe@example.com",
   "password": "securePass123",
   "firstName": "Jane",
   "lastName": "Doe",
@@ -18,12 +18,18 @@ Content-Type: application/json
   "dateOfBirth": "1990-04-15"
 }
 
-### ──────────────────────────────────────────────────
-### 2. Get patient by ID
-###    Replace the UUID below with the id from step 1
-### ──────────────────────────────────────────────────
-@patientId = {{createPatient.response.body.$.id}}
+> {%
+  client.global.set("patientId", response.body.id);
+%}
 
+### ──────────────────────────────────────────────────
+### 2. Get all patients
+### ──────────────────────────────────────────────────
+GET {{baseUrl}}/patients
+
+### ──────────────────────────────────────────────────
+### 3. Get patient by ID
+### ──────────────────────────────────────────────────
 GET {{baseUrl}}/patients/{{patientId}}
 
 ### ──────────────────────────────────────────────────
@@ -46,7 +52,6 @@ Content-Type: application/json
 ### ──────────────────────────────────────────────────
 ### 4. Add provincial health coverage (OHIP)
 ### ──────────────────────────────────────────────────
-# @name addCoverage
 POST {{baseUrl}}/patients/{{patientId}}/coverage
 Content-Type: application/json
 
@@ -58,6 +63,10 @@ Content-Type: application/json
   "expiryDate": "2027-12-31",
   "primary": true
 }
+
+> {%
+  client.global.set("coverageId", response.body.id);
+%}
 
 ### ──────────────────────────────────────────────────
 ### 5. Add private insurance
@@ -73,22 +82,19 @@ Content-Type: application/json
 }
 
 ### ──────────────────────────────────────────────────
-### 6. List all active coverage for a patient
+### 6. List all active coverage
 ### ──────────────────────────────────────────────────
 GET {{baseUrl}}/patients/{{patientId}}/coverage
 
 ### ──────────────────────────────────────────────────
-### 7. Deactivate a coverage record
-###    Replace coverageId with the id from step 4
+### 7. Deactivate coverage (run #4 first)
 ### ──────────────────────────────────────────────────
-@coverageId = {{addCoverage.response.body.$.id}}
-
 DELETE {{baseUrl}}/patients/{{patientId}}/coverage/{{coverageId}}
 
 ### ──────────────────────────────────────────────────
 ### 8. Register patient to a clinic
-###    (requires a clinic row in the DB — insert manually or
-###     wait for the clinic module PR)
+###    Needs a real clinic UUID in the DB.
+###    Run after clinic module is merged.
 ### ──────────────────────────────────────────────────
 POST {{baseUrl}}/patients/{{patientId}}/registrations
 Content-Type: application/json
@@ -103,9 +109,8 @@ Content-Type: application/json
 GET {{baseUrl}}/patients/{{patientId}}/registrations
 
 ### ──────────────────────────────────────────────────
-### 10. Record a consent event (DATA_PROCESSING)
+### 10. Record consent (DATA_PROCESSING)
 ### ──────────────────────────────────────────────────
-# @name recordConsent
 POST {{baseUrl}}/patients/{{patientId}}/consents
 Content-Type: application/json
 
@@ -116,7 +121,7 @@ Content-Type: application/json
 }
 
 ### ──────────────────────────────────────────────────
-### 11. Record consent revocation
+### 11. Revoke consent (MARKETING)
 ### ──────────────────────────────────────────────────
 POST {{baseUrl}}/patients/{{patientId}}/consents
 Content-Type: application/json
@@ -133,7 +138,7 @@ Content-Type: application/json
 GET {{baseUrl}}/patients/{{patientId}}/consents
 
 ### ──────────────────────────────────────────────────
-### Error cases — validation
+### Error cases
 ### ──────────────────────────────────────────────────
 
 ### Missing email → 400

@@ -33,7 +33,7 @@ public class AuditLog {
     @Column(name = "resource_id")
     private UUID resourceId;
 
-    @Column(name = "ip_address", columnDefinition = "inet")
+    @Column(name = "ip_address")
     private String ipAddress;
 
     @Column(name = "user_agent")
