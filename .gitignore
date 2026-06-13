@@ -48,3 +48,9 @@ src/test/resources/testcontainers.properties
 ### Local API test file — not part of the deliverable
 requests.http
 patients.http
+
+### Frontend (React/Vite)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/*.tsbuildinfo

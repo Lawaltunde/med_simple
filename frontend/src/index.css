@@ -1,0 +1,92 @@
+@import "tailwindcss";
+
+/* ============================================================
+   MedSimple design tokens — derived from the brand assets.
+   Brand is emerald/teal green. Everything inherits from here.
+   ============================================================ */
+@theme {
+  /* Brand green scale (primary) */
+  --color-brand-50: #eef8f3;
+  --color-brand-100: #d6eee4;
+  --color-brand-200: #aaddc8;
+  --color-brand-300: #7fe3c4; /* mint accent from the logo */
+  --color-brand-400: #3bbd96;
+  --color-brand-500: #1aa079; /* tile gradient start */
+  --color-brand-600: #16876a; /* wordmark "Simple" — primary action */
+  --color-brand-700: #0e5c49; /* tile gradient end */
+  --color-brand-800: #0c4f3f;
+  --color-brand-900: #0e2c24; /* wordmark "Med" — ink */
+  --color-brand-950: #0a2620;
+
+  /* Neutral grays (warm, slightly green-tinted for cohesion) */
+  --color-ink: #0e2c24;
+  --color-muted: #5b7068;
+  --color-line: #e2ebe7;
+  --color-surface: #ffffff;
+  --color-canvas: #f6faf8;
+
+  /* Urgency semantics — clinical, used in queue + triage badges */
+  --color-urgency-emergency: #dc2626; /* red */
+  --color-urgency-urgent: #ea580c;    /* amber-orange */
+  --color-urgency-soon: #2563eb;      /* blue — the only place blue appears */
+  --color-urgency-routine: #16876a;   /* brand green */
+
+  /* Radii — echo the logo tile's generous rounding */
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.75rem;
+
+  /* Type */
+  --font-sans: system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
+* {
+  border-color: var(--color-line);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Accessibility: visible focus ring everywhere, brand-colored */
+:focus-visible {
+  outline: 2px solid var(--color-brand-600);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Healthcare must respect vestibular needs — kill motion when asked */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Subtle, reusable entrance used sparingly */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

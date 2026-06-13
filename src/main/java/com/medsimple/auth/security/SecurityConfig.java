@@ -31,8 +31,13 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // Auth + patient self-registration are public.
                         .requestMatchers("/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/patients").permitAll()
+                        // SPA shell, built assets, and brand images — the frontend is public; it
+                        // authenticates client-side and calls the protected APIs with a Bearer token.
+                        .requestMatchers("/", "/index.html", "/favicon.ico", "/assets/**",
+                                "/banners_logo/**", "/login", "/signup", "/app/**", "/console/**").permitAll()
                         .requestMatchers("/error").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(e -> e.authenticationEntryPoint(authenticationEntryPoint))
