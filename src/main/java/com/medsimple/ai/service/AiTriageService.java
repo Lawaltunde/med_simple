@@ -28,6 +28,7 @@ public class AiTriageService {
     private final SymptomEpisodeRepository episodeRepository;
     private final SymptomSubmissionRepository submissionRepository;
     private final AuditService auditService;
+    private final com.medsimple.notification.service.NotificationService notificationService;
 
     @Transactional
     public EpisodeResponse triageEpisode(UUID episodeId) {
@@ -57,6 +58,20 @@ public class AiTriageService {
         SymptomEpisode saved = episodeRepository.save(episode);
         auditService.log(episode.getPatient().getId(), "EPISODE_AI_TRIAGED",
                 "symptom_episodes", episodeId, null);
+
+        // Notify the patient that their symptoms have been assessed.
+        UUID patientId = episode.getPatient().getId();
+        if (result.urgencyLevel() == UrgencyLevel.EMERGENCY) {
+            notificationService.notify(patientId,
+                    com.medsimple.notification.entity.NotificationType.EMERGENCY_ALERT,
+                    "Urgent: seek care now",
+                    "Your reported symptoms may be an emergency. Please call 911 or go to the nearest emergency department.");
+        } else {
+            notificationService.notify(patientId,
+                    com.medsimple.notification.entity.NotificationType.URGENCY_UPDATED,
+                    "Your symptoms have been assessed",
+                    "Assessed urgency: " + result.urgencyLevel() + ". " + result.summary());
+        }
 
         List<SymptomSubmission> submissions = submissionRepository.findByEpisodeIdOrderBySubmittedAtAsc(episodeId);
         return toResponse(saved, submissions);
