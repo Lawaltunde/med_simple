@@ -4,7 +4,8 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 
 // Builds the SPA into Spring's static dir so the backend serves it.
-// emptyOutDir:false preserves static/banners_logo (brand assets live there).
+// Brand assets are the source-of-truth in public/ and get copied into the build,
+// so emptyOutDir:true keeps static/ a clean, fully-generated output.
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
@@ -12,7 +13,7 @@ export default defineConfig({
   },
   build: {
     outDir: "../src/main/resources/static",
-    emptyOutDir: false,
+    emptyOutDir: true,
     assetsDir: "assets",
   },
   server: {
