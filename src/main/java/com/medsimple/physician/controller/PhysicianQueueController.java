@@ -8,11 +8,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
 
+// Clinical staff actions. Reading the queue is open to any authenticated clinic user;
+// assigning and confirming urgency are physician-only.
 @RestController
 @RequiredArgsConstructor
 public class PhysicianQueueController {
@@ -25,6 +28,7 @@ public class PhysicianQueueController {
         return ResponseEntity.ok(queueService.getQueue(clinicId));
     }
 
+    @PreAuthorize("hasRole('PHYSICIAN')")
     @PostMapping("/api/v1/episodes/{episodeId}/assign")
     public ResponseEntity<QueueEntryResponse> assignPhysician(@PathVariable UUID episodeId,
                                                               @Valid @RequestBody AssignPhysicianRequest request,
@@ -33,6 +37,7 @@ public class PhysicianQueueController {
                 queueService.assignPhysician(episodeId, request.physicianId(), httpRequest.getRemoteAddr()));
     }
 
+    @PreAuthorize("hasRole('PHYSICIAN')")
     @PostMapping("/api/v1/episodes/{episodeId}/confirm-urgency")
     public ResponseEntity<QueueEntryResponse> confirmUrgency(@PathVariable UUID episodeId,
                                                              @Valid @RequestBody ConfirmUrgencyRequest request,
