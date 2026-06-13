@@ -11,6 +11,7 @@ import com.medsimple.diagnostic.exception.InvalidRequisitionStateException;
 import com.medsimple.diagnostic.exception.RequisitionNotFoundException;
 import com.medsimple.diagnostic.exception.ResultNotFoundException;
 import com.medsimple.diagnostic.exception.ResultNotReleasedException;
+import com.medsimple.media.exception.SubmissionNotFoundException;
 import com.medsimple.notification.exception.NotificationNotFoundException;
 import com.medsimple.referral.exception.InvalidReferralStateException;
 import com.medsimple.referral.exception.ReferralNotFoundException;
@@ -37,7 +38,7 @@ public class GlobalExceptionHandler {
 
     record ApiError(int status, String error, String message, Instant timestamp) {}
 
-    @ExceptionHandler({PatientNotFoundException.class, ClinicNotFoundException.class, EpisodeNotFoundException.class, CarePlanNotFoundException.class, PrescriptionNotFoundException.class, ReferralNotFoundException.class, RequisitionNotFoundException.class, ResultNotFoundException.class, NotificationNotFoundException.class})
+    @ExceptionHandler({PatientNotFoundException.class, ClinicNotFoundException.class, EpisodeNotFoundException.class, CarePlanNotFoundException.class, PrescriptionNotFoundException.class, ReferralNotFoundException.class, RequisitionNotFoundException.class, ResultNotFoundException.class, NotificationNotFoundException.class, SubmissionNotFoundException.class})
     public ResponseEntity<ApiError> handleNotFound(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ApiError(404, "NOT_FOUND", ex.getMessage(), Instant.now()));
