@@ -1,0 +1,35 @@
+<svg width="1200" height="300" viewBox="0 0 1200 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="MedSimple brand banner">
+  <defs>
+    <linearGradient id="b3bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#17946F"/>
+      <stop offset="1" stop-color="#0B4B3C"/>
+    </linearGradient>
+    <linearGradient id="b3tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1FB488"/>
+      <stop offset="1" stop-color="#0E5C49"/>
+    </linearGradient>
+    <clipPath id="b3clip"><rect width="1200" height="300" rx="28"/></clipPath>
+  </defs>
+
+  <g clip-path="url(#b3clip)">
+    <rect width="1200" height="300" fill="url(#b3bg)"/>
+
+    <!-- ambient rings -->
+    <circle cx="1080" cy="60" r="150" fill="#ffffff" opacity="0.04"/>
+    <circle cx="120" cy="280" r="120" fill="#ffffff" opacity="0.04"/>
+
+    <!-- full-width ambient pulse -->
+    <path d="M0 240 H560 L584 240 L604 188 L628 292 L648 240 H760 L780 240 L796 210 L812 268 L826 240 H1200"
+          fill="none" stroke="#FFFFFF" stroke-opacity="0.14" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+    <!-- centered logo lockup -->
+    <g transform="translate(600,0)">
+      <rect x="-258" y="92" width="76" height="76" rx="20" fill="url(#b3tile)"/>
+      <path d="M-238 130 H-220 L-213 110 L-203 152 L-194 118 L-189 130 H-178" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="-160" y="152" font-family="system-ui,'Segoe UI',Roboto,Arial,sans-serif" font-weight="800" font-size="68" letter-spacing="-2"><tspan fill="#FFFFFF">Med</tspan><tspan fill="#7FE3C4">Simple</tspan></text>
+    </g>
+
+    <!-- tagline -->
+    <text x="600" y="208" text-anchor="middle" font-family="system-ui,'Segoe UI',Roboto,Arial,sans-serif" font-weight="500" font-size="22" letter-spacing="0.5" fill="#CFEBE0">Text it. Photograph it. Speak it. We'll take it from there.</text>
+  </g>
+</svg>
