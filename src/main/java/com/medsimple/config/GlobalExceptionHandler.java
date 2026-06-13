@@ -1,5 +1,7 @@
 package com.medsimple.config;
 
+import com.medsimple.auth.exception.InvalidCredentialsException;
+import com.medsimple.auth.exception.InvalidTokenException;
 import com.medsimple.careplan.exception.CarePlanNotFoundException;
 import com.medsimple.clinic.exception.ClinicNotFoundException;
 import com.medsimple.clinic.exception.StaffAlreadyExistsException;
@@ -20,6 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -51,6 +54,20 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleNotReleased(ResultNotReleasedException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(new ApiError(403, "NOT_RELEASED", ex.getMessage(), Instant.now()));
+    }
+
+    @ExceptionHandler({InvalidCredentialsException.class, InvalidTokenException.class})
+    public ResponseEntity<ApiError> handleAuthFailure(RuntimeException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(new ApiError(401, "UNAUTHORIZED", ex.getMessage(), Instant.now()));
+    }
+
+    // @PreAuthorize denial — authenticated but lacking the required role.
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ApiError(403, "FORBIDDEN", "You do not have permission to perform this action",
+                        Instant.now()));
     }
 
     @ExceptionHandler({PatientAlreadyRegisteredException.class, EmailAlreadyInUseException.class, StaffAlreadyExistsException.class})
