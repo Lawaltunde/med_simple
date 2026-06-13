@@ -5,6 +5,10 @@ import com.medsimple.clinic.exception.ClinicNotFoundException;
 import com.medsimple.clinic.exception.StaffAlreadyExistsException;
 import com.medsimple.prescription.exception.InvalidPrescriptionStateException;
 import com.medsimple.prescription.exception.PrescriptionNotFoundException;
+import com.medsimple.diagnostic.exception.InvalidRequisitionStateException;
+import com.medsimple.diagnostic.exception.RequisitionNotFoundException;
+import com.medsimple.diagnostic.exception.ResultNotFoundException;
+import com.medsimple.diagnostic.exception.ResultNotReleasedException;
 import com.medsimple.referral.exception.InvalidReferralStateException;
 import com.medsimple.referral.exception.ReferralNotFoundException;
 import com.medsimple.symptom.exception.EpisodeNotFoundException;
@@ -29,16 +33,23 @@ public class GlobalExceptionHandler {
 
     record ApiError(int status, String error, String message, Instant timestamp) {}
 
-    @ExceptionHandler({PatientNotFoundException.class, ClinicNotFoundException.class, EpisodeNotFoundException.class, CarePlanNotFoundException.class, PrescriptionNotFoundException.class, ReferralNotFoundException.class})
+    @ExceptionHandler({PatientNotFoundException.class, ClinicNotFoundException.class, EpisodeNotFoundException.class, CarePlanNotFoundException.class, PrescriptionNotFoundException.class, ReferralNotFoundException.class, RequisitionNotFoundException.class, ResultNotFoundException.class})
     public ResponseEntity<ApiError> handleNotFound(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ApiError(404, "NOT_FOUND", ex.getMessage(), Instant.now()));
     }
 
-    @ExceptionHandler({InvalidPrescriptionStateException.class, InvalidReferralStateException.class})
+    @ExceptionHandler({InvalidPrescriptionStateException.class, InvalidReferralStateException.class, InvalidRequisitionStateException.class})
     public ResponseEntity<ApiError> handleInvalidState(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ApiError(409, "INVALID_STATE", ex.getMessage(), Instant.now()));
+    }
+
+    // PHIPA gate violation — the patient asked for a result that is not yet released.
+    @ExceptionHandler(ResultNotReleasedException.class)
+    public ResponseEntity<ApiError> handleNotReleased(ResultNotReleasedException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new ApiError(403, "NOT_RELEASED", ex.getMessage(), Instant.now()));
     }
 
     @ExceptionHandler({PatientAlreadyRegisteredException.class, EmailAlreadyInUseException.class, StaffAlreadyExistsException.class})
