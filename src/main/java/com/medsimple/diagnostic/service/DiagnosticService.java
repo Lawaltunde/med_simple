@@ -28,6 +28,7 @@ public class DiagnosticService {
     private final RequisitionDeliveryResolver deliveryResolver;
     private final ResultSummaryDao resultSummaryDao;
     private final AuditService auditService;
+    private final com.medsimple.notification.service.NotificationService notificationService;
 
     // ── Requisition lifecycle ───────────────────────────────────────────────────
 
@@ -164,6 +165,14 @@ public class DiagnosticService {
         DiagnosticResult saved = resultRepository.save(result);
         auditService.log(result.getOrderingPhysician().getId(), "RESULT_RELEASED",
                 "diagnostic_results", resultId, ipAddress);
+
+        // Now that the physician has released it, tell the patient the result is available.
+        notificationService.notify(result.getPatient().getId(),
+                com.medsimple.notification.entity.NotificationType.RESULT_READY,
+                "Your test result is ready",
+                "Your " + result.getRequisition().getTestType()
+                        + " result has been reviewed by your physician and is now available to view.");
+
         return toPhysicianResponse(saved);
     }
 
