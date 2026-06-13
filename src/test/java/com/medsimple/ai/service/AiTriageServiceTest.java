@@ -33,6 +33,7 @@ class AiTriageServiceTest {
     @Mock SymptomEpisodeRepository episodeRepository;
     @Mock SymptomSubmissionRepository submissionRepository;
     @Mock AuditService auditService;
+    @Mock com.medsimple.notification.service.NotificationService notificationService;
 
     @InjectMocks AiTriageService aiTriageService;
 

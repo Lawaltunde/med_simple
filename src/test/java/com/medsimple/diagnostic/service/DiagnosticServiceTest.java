@@ -39,6 +39,7 @@ class DiagnosticServiceTest {
     @Mock RequisitionDeliveryDao deliveryDao;
     @Mock ResultSummaryDao resultSummaryDao;
     @Mock AuditService auditService;
+    @Mock com.medsimple.notification.service.NotificationService notificationService;
 
     @InjectMocks DiagnosticService diagnosticService;
 
