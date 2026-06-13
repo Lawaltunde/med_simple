@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -56,6 +57,7 @@ public class DiagnosticController {
 
     // ── Results: physician side ─────────────────────────────────────────────────
 
+    @PreAuthorize("hasRole('PHYSICIAN')")
     @PostMapping("/api/v1/requisitions/{requisitionId}/result")
     public ResponseEntity<PhysicianResultResponse> recordResult(
             @PathVariable UUID requisitionId, @Valid @RequestBody RecordResultRequest request,
@@ -64,11 +66,13 @@ public class DiagnosticController {
                 .body(diagnosticService.recordResult(requisitionId, request, httpRequest.getRemoteAddr()));
     }
 
+    @PreAuthorize("hasRole('PHYSICIAN')")
     @GetMapping("/api/v1/results/{id}")
     public ResponseEntity<PhysicianResultResponse> getResultForPhysician(@PathVariable UUID id) {
         return ResponseEntity.ok(diagnosticService.getResultForPhysician(id));
     }
 
+    @PreAuthorize("hasRole('PHYSICIAN')")
     @PostMapping("/api/v1/results/{id}/interpretation")
     public ResponseEntity<PhysicianResultResponse> addInterpretation(
             @PathVariable UUID id, @Valid @RequestBody AddInterpretationRequest request,
@@ -76,6 +80,8 @@ public class DiagnosticController {
         return ResponseEntity.ok(diagnosticService.addInterpretation(id, request, httpRequest.getRemoteAddr()));
     }
 
+    // The PHIPA gate's trigger — physician-only, in addition to the service-layer release rules.
+    @PreAuthorize("hasRole('PHYSICIAN')")
     @PostMapping("/api/v1/results/{id}/release")
     public ResponseEntity<PhysicianResultResponse> releaseResult(@PathVariable UUID id, HttpServletRequest httpRequest) {
         return ResponseEntity.ok(diagnosticService.releaseResult(id, httpRequest.getRemoteAddr()));
