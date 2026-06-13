@@ -7,17 +7,20 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
 
+// Authoring, signing, and sending prescriptions are physician-only.
 @RestController
 @RequiredArgsConstructor
 public class PrescriptionController {
 
     private final PrescriptionService prescriptionService;
 
+    @PreAuthorize("hasRole('PHYSICIAN')")
     @PostMapping("/api/v1/prescriptions")
     public ResponseEntity<PrescriptionResponse> create(@Valid @RequestBody CreatePrescriptionRequest request,
                                                        HttpServletRequest httpRequest) {
@@ -35,11 +38,13 @@ public class PrescriptionController {
         return ResponseEntity.ok(prescriptionService.getCarePlanPrescriptions(carePlanId));
     }
 
+    @PreAuthorize("hasRole('PHYSICIAN')")
     @PostMapping("/api/v1/prescriptions/{id}/sign")
     public ResponseEntity<PrescriptionResponse> sign(@PathVariable UUID id, HttpServletRequest httpRequest) {
         return ResponseEntity.ok(prescriptionService.signPrescription(id, httpRequest.getRemoteAddr()));
     }
 
+    @PreAuthorize("hasRole('PHYSICIAN')")
     @PostMapping("/api/v1/prescriptions/{id}/send")
     public ResponseEntity<PrescriptionResponse> send(@PathVariable UUID id,
                                                      @RequestBody(required = false) SendPrescriptionRequest request,
