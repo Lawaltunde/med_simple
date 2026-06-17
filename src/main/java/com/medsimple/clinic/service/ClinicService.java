@@ -53,6 +53,15 @@ public class ClinicService {
         return clinicRepository.findAll().stream().map(this::toResponse).toList();
     }
 
+    // Clinics the given user is active staff at. Empty for patients (they aren't staff),
+    // which is how the console knows which clinic's queue to load.
+    @Transactional(readOnly = true)
+    public List<ClinicResponse> getClinicsForUser(UUID userId) {
+        return staffRepository.findByUserIdAndActiveTrue(userId).stream()
+                .map(staff -> toResponse(staff.getClinic()))
+                .toList();
+    }
+
     @Transactional(readOnly = true)
     public ClinicResponse getClinic(UUID id) {
         return toResponse(findClinicById(id));

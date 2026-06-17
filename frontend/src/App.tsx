@@ -9,6 +9,12 @@ import { PatientHome } from "@/pages/patient/PatientHome";
 import { NewSymptomCheck } from "@/pages/patient/NewSymptomCheck";
 import { EpisodeDetail } from "@/pages/patient/EpisodeDetail";
 import { ComingSoon } from "@/pages/patient/ComingSoon";
+import { ConsoleApp } from "@/pages/console/ConsoleApp";
+import { QueuePage } from "@/pages/console/QueuePage";
+import { EpisodeReview } from "@/pages/console/EpisodeReview";
+
+// Clinic staff roles that may enter the console.
+const STAFF_ROLES = ["PHYSICIAN", "NURSE", "RECEPTIONIST", "CLINIC_ADMIN", "SUPER_ADMIN"] as const;
 
 export function App() {
   return (
@@ -38,6 +44,20 @@ export function App() {
             <Route path="results" element={<ComingSoon title="Test results" />} />
             <Route path="notifications" element={<ComingSoon title="Notifications" />} />
             {/* Unknown /app/* path stays in the shell rather than bouncing to the landing page. */}
+            <Route path="*" element={<ComingSoon title="This page" description="That section isn't available yet." />} />
+          </Route>
+
+          {/* Clinician console (authenticated, clinic staff) */}
+          <Route
+            path="/console"
+            element={
+              <ProtectedRoute allow={[...STAFF_ROLES]}>
+                <ConsoleApp />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<QueuePage />} />
+            <Route path="episodes/:id" element={<EpisodeReview />} />
             <Route path="*" element={<ComingSoon title="This page" description="That section isn't available yet." />} />
           </Route>
 
