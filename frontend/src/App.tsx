@@ -8,6 +8,7 @@ import { PatientApp } from "@/pages/patient/PatientApp";
 import { PatientHome } from "@/pages/patient/PatientHome";
 import { NewSymptomCheck } from "@/pages/patient/NewSymptomCheck";
 import { EpisodeDetail } from "@/pages/patient/EpisodeDetail";
+import { ComingSoon } from "@/pages/patient/ComingSoon";
 
 export function App() {
   return (
@@ -31,7 +32,13 @@ export function App() {
             <Route index element={<PatientHome />} />
             <Route path="new" element={<NewSymptomCheck />} />
             <Route path="episodes/:id" element={<EpisodeDetail />} />
-            {/* /app/care-plans, /app/prescriptions, … added as those screens are built */}
+            {/* Navigable but not built yet — placeholders so the sidebar never dead-ends. */}
+            <Route path="care-plans" element={<ComingSoon title="Care plans" />} />
+            <Route path="prescriptions" element={<ComingSoon title="Prescriptions" />} />
+            <Route path="results" element={<ComingSoon title="Test results" />} />
+            <Route path="notifications" element={<ComingSoon title="Notifications" />} />
+            {/* Unknown /app/* path stays in the shell rather than bouncing to the landing page. */}
+            <Route path="*" element={<ComingSoon title="This page" description="That section isn't available yet." />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
