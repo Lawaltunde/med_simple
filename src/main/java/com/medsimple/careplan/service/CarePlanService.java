@@ -1,6 +1,7 @@
 package com.medsimple.careplan.service;
 
 import com.medsimple.audit.service.AuditService;
+import com.medsimple.auth.security.AccessGuard;
 import com.medsimple.careplan.dto.*;
 import com.medsimple.careplan.entity.CarePlan;
 import com.medsimple.careplan.entity.CarePlanStatus;
@@ -8,6 +9,8 @@ import com.medsimple.careplan.entity.FollowUp;
 import com.medsimple.careplan.exception.CarePlanNotFoundException;
 import com.medsimple.careplan.repository.CarePlanRepository;
 import com.medsimple.careplan.repository.FollowUpRepository;
+import com.medsimple.notification.entity.NotificationType;
+import com.medsimple.notification.service.NotificationService;
 import com.medsimple.patient.exception.PatientNotFoundException;
 import com.medsimple.patient.repository.PatientRepository;
 import com.medsimple.shared.entity.User;
@@ -35,6 +38,8 @@ public class CarePlanService {
     private final PatientRepository userRepository;
     private final AuditService auditService;
     private final EntityManager entityManager;
+    private final NotificationService notificationService;
+    private final AccessGuard accessGuard;
 
     @Transactional
     public CarePlanResponse createCarePlan(CreateCarePlanRequest request, String ipAddress) {
@@ -63,17 +68,23 @@ public class CarePlanService {
         episodeRepository.save(episode);
 
         auditService.log(request.physicianId(), "CARE_PLAN_CREATED", "care_plans", saved.getId(), ipAddress);
+        // Close the loop back to the patient — this is the care delivered for their complaint.
+        notificationService.notify(episode.getPatient().getId(), NotificationType.CARE_PLAN_UPDATE,
+                "Your care plan is ready",
+                "A physician has reviewed your symptoms and created a care plan. Tap to read it.");
         return toResponse(saved, List.of());
     }
 
     @Transactional(readOnly = true)
     public CarePlanResponse getCarePlan(UUID id) {
         CarePlan carePlan = findCarePlanById(id);
+        accessGuard.requirePatientSelfOrStaff(carePlan.getPatient().getId());
         return toResponse(carePlan, followUpRepository.findByCarePlanIdOrderByCreatedAtAsc(id));
     }
 
     @Transactional(readOnly = true)
     public List<CarePlanResponse> getPatientCarePlans(UUID patientId) {
+        accessGuard.requirePatientSelfOrStaff(patientId);
         userRepository.findByIdAndRole(patientId, UserRole.PATIENT)
                 .orElseThrow(() -> new PatientNotFoundException(patientId));
         return carePlanRepository.findByPatientIdOrderByCreatedAtDesc(patientId).stream()
@@ -83,6 +94,7 @@ public class CarePlanService {
 
     @Transactional
     public CarePlanResponse updateCarePlan(UUID id, UpdateCarePlanRequest request, String ipAddress) {
+        accessGuard.requireStaff(); // editing/closing a plan is a clinician action
         CarePlan carePlan = findCarePlanById(id);
 
         if (request.notes() != null) carePlan.setNotes(request.notes());
@@ -104,6 +116,7 @@ public class CarePlanService {
     @Transactional
     public FollowUpResponse addFollowUp(UUID carePlanId, AddFollowUpRequest request, String ipAddress) {
         CarePlan carePlan = findCarePlanById(carePlanId);
+        accessGuard.requirePatientSelfOrStaff(carePlan.getPatient().getId());
 
         FollowUp.FollowUpBuilder builder = FollowUp.builder()
                 .carePlan(carePlan)
@@ -116,6 +129,19 @@ public class CarePlanService {
 
         FollowUp saved = followUpRepository.save(builder.build());
         auditService.log(request.initiatedBy(), "FOLLOW_UP_ADDED", "follow_ups", saved.getId(), ipAddress);
+
+        // Notify the other side. A physician message goes to the patient; a patient
+        // question goes to the physician; a system prompt nudges the patient.
+        UUID patientId = carePlan.getPatient().getId();
+        UUID physicianId = carePlan.getPhysician().getId();
+        if (request.system() || request.initiatedBy() == null) {
+            notificationService.notify(patientId, NotificationType.FOLLOW_UP_PROMPT,
+                    "A question about your care", request.message());
+        } else {
+            boolean fromPhysician = request.initiatedBy().equals(physicianId);
+            notificationService.notify(fromPhysician ? patientId : physicianId,
+                    NotificationType.FOLLOW_UP_RECEIVED, "New message about your care plan", request.message());
+        }
         return toFollowUpResponse(saved);
     }
 
@@ -124,6 +150,7 @@ public class CarePlanService {
                                               RespondFollowUpRequest request, String ipAddress) {
         FollowUp followUp = followUpRepository.findByIdAndCarePlanId(followUpId, carePlanId)
                 .orElseThrow(() -> new CarePlanNotFoundException(carePlanId));
+        accessGuard.requirePatientSelfOrStaff(followUp.getCarePlan().getPatient().getId());
 
         followUp.setResponse(request.response());
         followUp.setRespondedBy(entityManager.getReference(User.class, request.respondedBy()));
@@ -131,6 +158,13 @@ public class CarePlanService {
 
         FollowUp saved = followUpRepository.save(followUp);
         auditService.log(request.respondedBy(), "FOLLOW_UP_RESPONDED", "follow_ups", followUpId, ipAddress);
+
+        // Tell whoever asked that they have a reply (fall back to the patient for system prompts).
+        UUID recipient = followUp.getInitiatedBy() != null
+                ? followUp.getInitiatedBy().getId()
+                : followUp.getCarePlan().getPatient().getId();
+        notificationService.notify(recipient, NotificationType.FOLLOW_UP_RECEIVED,
+                "Reply to your message", request.response());
         return toFollowUpResponse(saved);
     }
 

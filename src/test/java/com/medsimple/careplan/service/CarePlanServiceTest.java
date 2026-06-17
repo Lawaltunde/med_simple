@@ -42,6 +42,8 @@ class CarePlanServiceTest {
     @Mock PatientRepository userRepository;
     @Mock AuditService auditService;
     @Mock EntityManager entityManager;
+    @Mock com.medsimple.notification.service.NotificationService notificationService;
+    @Mock com.medsimple.auth.security.AccessGuard accessGuard;
 
     @InjectMocks CarePlanService carePlanService;
 
@@ -89,6 +91,35 @@ class CarePlanServiceTest {
         assertThat(episode.getStatus()).isEqualTo(EpisodeStatus.IN_PROGRESS);
         verify(episodeRepository).save(episode);
         verify(auditService).log(eq(physicianId), eq("CARE_PLAN_CREATED"), eq("care_plans"), any(), eq("127.0.0.1"));
+        // The patient is notified that care was delivered for their complaint.
+        verify(notificationService).notify(eq(patient.getId()),
+                eq(com.medsimple.notification.entity.NotificationType.CARE_PLAN_UPDATE), anyString(), anyString());
+    }
+
+    // ── ownership gate + completion + messaging ──────────────────────────────────
+
+    @Test
+    void getPatientCarePlans_deniedForOtherPatient_neverQueries() {
+        UUID patientId = UUID.randomUUID();
+        doThrow(new org.springframework.security.access.AccessDeniedException("denied"))
+                .when(accessGuard).requirePatientSelfOrStaff(patientId);
+
+        assertThatThrownBy(() -> carePlanService.getPatientCarePlans(patientId))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(carePlanRepository);
+    }
+
+    @Test
+    void addFollowUp_fromPhysician_notifiesPatient() {
+        CarePlan plan = sampleCarePlan();
+        when(carePlanRepository.findById(plan.getId())).thenReturn(Optional.of(plan));
+        when(followUpRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        carePlanService.addFollowUp(plan.getId(),
+                new AddFollowUpRequest(physicianId, false, "How are you feeling after 3 days?"), null);
+
+        verify(notificationService).notify(eq(patient.getId()),
+                eq(com.medsimple.notification.entity.NotificationType.FOLLOW_UP_RECEIVED), anyString(), anyString());
     }
 
     @Test
@@ -126,6 +157,7 @@ class CarePlanServiceTest {
         assertThat(cp.getStatus()).isEqualTo(CarePlanStatus.COMPLETED);
         assertThat(episode.getStatus()).isEqualTo(EpisodeStatus.RESOLVED);
         verify(episodeRepository).save(episode);
+        verify(accessGuard).requireStaff(); // closing a plan is a clinician-only action
     }
 
     @Test
