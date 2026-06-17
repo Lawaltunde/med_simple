@@ -78,6 +78,17 @@ class SecurityIntegrationTest {
     }
 
     @Test
+    void patientAccessingAnotherPatientsEpisodes_returns403() {
+        // A valid PATIENT token whose id is not the path patientId -> ownership gate denies
+        // before any DB access. This is the IDOR fix exercised through the real filter chain.
+        HttpStatusCode status = client().get()
+                .uri("/api/v1/patients/{id}/episodes", UUID.randomUUID())
+                .header("Authorization", "Bearer " + tokenFor(UserRole.PATIENT))
+                .exchange((req, res) -> res.getStatusCode());
+        assertThat(status.value()).isEqualTo(403);
+    }
+
+    @Test
     void refresh_withoutCookie_returns401() {
         // No refresh cookie present -> rejected before any DB access.
         HttpStatusCode status = client().post()

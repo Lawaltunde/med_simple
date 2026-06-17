@@ -1,6 +1,7 @@
 package com.medsimple.symptom.service;
 
 import com.medsimple.audit.service.AuditService;
+import com.medsimple.auth.security.AccessGuard;
 import com.medsimple.clinic.entity.Clinic;
 import com.medsimple.patient.entity.PatientClinicRegistration;
 import com.medsimple.patient.exception.PatientNotFoundException;
@@ -31,9 +32,12 @@ public class SymptomService {
     private final PatientClinicRegistrationRepository registrationRepository;
     private final AuditService auditService;
     private final EntityManager entityManager;
+    private final AccessGuard accessGuard;
 
     @Transactional
     public EpisodeResponse startEpisode(UUID patientId, StartEpisodeRequest request, String ipAddress) {
+        accessGuard.requirePatientSelfOrStaff(patientId);
+
         User patient = patientRepository.findByIdAndRole(patientId, UserRole.PATIENT)
                 .orElseThrow(() -> new PatientNotFoundException(patientId));
 
@@ -61,6 +65,8 @@ public class SymptomService {
 
     @Transactional(readOnly = true)
     public List<EpisodeResponse> getPatientEpisodes(UUID patientId) {
+        accessGuard.requirePatientSelfOrStaff(patientId);
+
         patientRepository.findByIdAndRole(patientId, UserRole.PATIENT)
                 .orElseThrow(() -> new PatientNotFoundException(patientId));
 
@@ -73,6 +79,8 @@ public class SymptomService {
     @Transactional(readOnly = true)
     public EpisodeResponse getEpisode(UUID episodeId) {
         SymptomEpisode episode = findEpisodeById(episodeId);
+        accessGuard.requirePatientSelfOrStaff(episode.getPatient().getId());
+
         List<SymptomSubmission> submissions = submissionRepository.findByEpisodeIdOrderBySubmittedAtAsc(episodeId);
         return toResponse(episode, submissions);
     }
@@ -80,6 +88,7 @@ public class SymptomService {
     @Transactional
     public SubmissionResponse addSubmission(UUID episodeId, AddSubmissionRequest request, String ipAddress) {
         SymptomEpisode episode = findEpisodeById(episodeId);
+        accessGuard.requirePatientSelfOrStaff(episode.getPatient().getId());
 
         SymptomSubmission submission = SymptomSubmission.builder()
                 .episode(episode)
@@ -102,6 +111,9 @@ public class SymptomService {
     @Transactional
     public SubmissionResponse updateSubmissionStatus(UUID episodeId, UUID submissionId,
                                                       UpdateSubmissionRequest request) {
+        // AI processing callback — patients must never write transcription / analysis results.
+        accessGuard.requireStaff();
+
         SymptomSubmission submission = submissionRepository.findByIdAndEpisodeId(submissionId, episodeId)
                 .orElseThrow(() -> new EpisodeNotFoundException(episodeId));
 
