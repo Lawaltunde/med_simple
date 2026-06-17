@@ -1,10 +1,17 @@
 import { Link } from "react-router-dom";
-import { PlusCircle, MessageSquareText, Camera, Mic, ArrowRight } from "lucide-react";
+import { PlusCircle, MessageSquareText, Camera, Mic, ArrowRight, Loader2, ChevronRight } from "lucide-react";
 import { useAuth } from "@/auth/AuthProvider";
 import { buttonVariants } from "@/components/ui/button";
+import { useEpisodes } from "@/features/symptom/hooks";
+import { effectiveUrgency } from "@/features/symptom/types";
+import { UrgencyBadge, statusLabel, formatDateTime } from "@/features/symptom/display";
+
+const RECENT_LIMIT = 5;
 
 export function PatientHome() {
   const { user } = useAuth();
+  const { data: episodes, isLoading } = useEpisodes(user?.id);
+  const recent = episodes?.slice(0, RECENT_LIMIT) ?? [];
 
   return (
     <div className="mx-auto max-w-4xl space-y-8">
@@ -44,7 +51,7 @@ export function PatientHome() {
         </div>
       </section>
 
-      {/* Recent activity placeholder — wired to the API in the next step */}
+      {/* Recent episodes */}
       <section className="rounded-2xl border border-line bg-white p-6">
         <div className="flex items-center justify-between">
           <h3 className="font-bold text-brand-900">Your recent episodes</h3>
@@ -52,12 +59,44 @@ export function PatientHome() {
             New <ArrowRight className="size-4" />
           </Link>
         </div>
-        <div className="mt-6 flex flex-col items-center justify-center rounded-xl bg-canvas py-12 text-center">
-          <p className="font-medium text-ink">No symptom checks yet</p>
-          <p className="mt-1 max-w-xs text-sm text-muted">
-            When you start a symptom check, it'll appear here with its urgency and status.
-          </p>
-        </div>
+
+        {isLoading ? (
+          <div className="mt-6 flex items-center justify-center gap-2 py-12 text-muted">
+            <Loader2 className="size-5 animate-spin" /> Loading…
+          </div>
+        ) : recent.length === 0 ? (
+          <div className="mt-6 flex flex-col items-center justify-center rounded-xl bg-canvas py-12 text-center">
+            <p className="font-medium text-ink">No symptom checks yet</p>
+            <p className="mt-1 max-w-xs text-sm text-muted">
+              When you start a symptom check, it'll appear here with its urgency and status.
+            </p>
+          </div>
+        ) : (
+          <ul className="mt-4 divide-y divide-line">
+            {recent.map((e) => {
+              const urgency = effectiveUrgency(e);
+              return (
+                <li key={e.id}>
+                  <Link
+                    to={`/app/episodes/${e.id}`}
+                    className="flex items-center gap-3 py-3 transition-colors hover:bg-brand-50/40 -mx-2 rounded-lg px-2"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[0.95rem] font-medium text-ink">
+                        {e.aiSummary ?? e.submissions[0]?.textContent ?? "Symptom check"}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted">
+                        {statusLabel(e.status)} · {formatDateTime(e.createdAt)}
+                      </p>
+                    </div>
+                    {urgency && <UrgencyBadge level={urgency} />}
+                    <ChevronRight className="size-4 shrink-0 text-muted" />
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
     </div>
   );
