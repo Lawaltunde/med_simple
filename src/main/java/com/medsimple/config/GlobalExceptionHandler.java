@@ -2,6 +2,7 @@ package com.medsimple.config;
 
 import com.medsimple.auth.exception.InvalidCredentialsException;
 import com.medsimple.auth.exception.InvalidTokenException;
+import com.medsimple.auth.exception.TooManyAttemptsException;
 import com.medsimple.careplan.exception.CarePlanNotFoundException;
 import com.medsimple.clinic.exception.ClinicNotFoundException;
 import com.medsimple.clinic.exception.StaffAlreadyExistsException;
@@ -61,6 +62,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleAuthFailure(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(new ApiError(401, "UNAUTHORIZED", ex.getMessage(), Instant.now()));
+    }
+
+    // Login throttle tripped — too many failed attempts for this identifier.
+    @ExceptionHandler(TooManyAttemptsException.class)
+    public ResponseEntity<ApiError> handleTooManyAttempts(TooManyAttemptsException ex) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(new ApiError(429, "TOO_MANY_REQUESTS", ex.getMessage(), Instant.now()));
     }
 
     // @PreAuthorize denial — authenticated but lacking the required role.
