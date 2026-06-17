@@ -34,6 +34,10 @@ public class SecurityConfig {
                         // Auth + patient self-registration are public.
                         .requestMatchers("/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/patients").permitAll()
+                        // Public clinic directory — the signup screen lets a patient pick their
+                        // family-practice clinic before they have an account. List only; staff and
+                        // capability subpaths stay authenticated.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/clinics").permitAll()
                         // SPA shell, built assets, and brand images — the frontend is public; it
                         // authenticates client-side and calls the protected APIs with a Bearer token.
                         .requestMatchers("/", "/index.html", "/favicon.ico", "/assets/**",

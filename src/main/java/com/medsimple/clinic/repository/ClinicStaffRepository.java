@@ -13,6 +13,9 @@ public interface ClinicStaffRepository extends JpaRepository<ClinicStaff, UUID> 
 
     List<ClinicStaff> findByClinicIdAndActiveTrue(UUID clinicId);
 
+    // A staff member's active clinic memberships — drives "which queue is mine".
+    List<ClinicStaff> findByUserIdAndActiveTrue(UUID userId);
+
     Optional<ClinicStaff> findByIdAndClinicId(UUID staffId, UUID clinicId);
 
     boolean existsByClinicIdAndUserId(UUID clinicId, UUID userId);
