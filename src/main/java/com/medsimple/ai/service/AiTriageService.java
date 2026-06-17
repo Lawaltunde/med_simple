@@ -4,6 +4,7 @@ import com.medsimple.ai.dao.AiTriageDao;
 import com.medsimple.ai.dto.EpisodeContext;
 import com.medsimple.ai.dto.TriageResult;
 import com.medsimple.audit.service.AuditService;
+import com.medsimple.auth.security.AccessGuard;
 import com.medsimple.symptom.dto.EpisodeResponse;
 import com.medsimple.symptom.dto.SubmissionResponse;
 import com.medsimple.symptom.entity.*;
@@ -29,11 +30,13 @@ public class AiTriageService {
     private final SymptomSubmissionRepository submissionRepository;
     private final AuditService auditService;
     private final com.medsimple.notification.service.NotificationService notificationService;
+    private final AccessGuard accessGuard;
 
     @Transactional
     public EpisodeResponse triageEpisode(UUID episodeId) {
         SymptomEpisode episode = episodeRepository.findById(episodeId)
                 .orElseThrow(() -> new EpisodeNotFoundException(episodeId));
+        accessGuard.requirePatientSelfOrStaff(episode.getPatient().getId());
 
         List<String> symptoms = collectSymptomTexts(episodeId);
         if (symptoms.isEmpty()) {

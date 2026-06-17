@@ -11,6 +11,7 @@ import com.medsimple.symptom.exception.EpisodeNotFoundException;
 import com.medsimple.symptom.repository.SymptomEpisodeRepository;
 import com.medsimple.symptom.repository.SymptomSubmissionRepository;
 import jakarta.persistence.EntityManager;
+import org.springframework.security.access.AccessDeniedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,6 +37,7 @@ class SymptomServiceTest {
     @Mock com.medsimple.patient.repository.PatientClinicRegistrationRepository registrationRepository;
     @Mock AuditService auditService;
     @Mock EntityManager entityManager;
+    @Mock com.medsimple.auth.security.AccessGuard accessGuard;
 
     @InjectMocks SymptomService symptomService;
 
@@ -82,6 +84,48 @@ class SymptomServiceTest {
         assertThat(response.patientId()).isEqualTo(patientId);
         assertThat(response.aiUrgencyLevel()).isNull();
         verify(auditService).log(patientId, "EPISODE_STARTED", "symptom_episodes", episodeId, "127.0.0.1");
+    }
+
+    // ── ownership gate (IDOR fix) ─────────────────────────────────────────────
+
+    @Test
+    void startEpisode_deniedForOtherPatient_neverTouchesData() {
+        doThrow(new AccessDeniedException("denied")).when(accessGuard).requirePatientSelfOrStaff(patientId);
+
+        assertThatThrownBy(() -> symptomService.startEpisode(patientId, new StartEpisodeRequest(null), null))
+                .isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(patientRepository, episodeRepository);
+    }
+
+    @Test
+    void getPatientEpisodes_deniedForOtherPatient_neverQueries() {
+        doThrow(new AccessDeniedException("denied")).when(accessGuard).requirePatientSelfOrStaff(patientId);
+
+        assertThatThrownBy(() -> symptomService.getPatientEpisodes(patientId))
+                .isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(episodeRepository);
+    }
+
+    @Test
+    void getEpisode_guardsOnEpisodeOwner() {
+        when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(sampleEpisode));
+        doThrow(new AccessDeniedException("denied")).when(accessGuard).requirePatientSelfOrStaff(patientId);
+
+        assertThatThrownBy(() -> symptomService.getEpisode(episodeId))
+                .isInstanceOf(AccessDeniedException.class);
+        // Owner is read from the loaded episode, then the gate runs before submissions are fetched.
+        verify(accessGuard).requirePatientSelfOrStaff(patientId);
+        verify(submissionRepository, never()).findByEpisodeIdOrderBySubmittedAtAsc(any());
+    }
+
+    @Test
+    void updateSubmissionStatus_deniedForPatients() {
+        doThrow(new AccessDeniedException("staff only")).when(accessGuard).requireStaff();
+
+        assertThatThrownBy(() -> symptomService.updateSubmissionStatus(episodeId, UUID.randomUUID(),
+                new UpdateSubmissionRequest(ProcessingStatus.COMPLETED, "x", "y")))
+                .isInstanceOf(AccessDeniedException.class);
+        verifyNoInteractions(submissionRepository);
     }
 
     @Test
