@@ -6,9 +6,10 @@ export type UserRole =
   | "CLINIC_ADMIN"
   | "SUPER_ADMIN";
 
-export interface AuthResponse {
+// The refresh token is delivered in an httpOnly cookie, never in this body — only the
+// short-lived access token reaches JS. (Backend DTO: AuthTokens.)
+export interface AuthTokens {
   accessToken: string;
-  refreshToken: string;
   tokenType: string;
   expiresInSeconds: number;
   userId: string;

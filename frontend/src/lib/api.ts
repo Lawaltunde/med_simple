@@ -32,6 +32,8 @@ export class ApiError extends Error {
 async function raw(path: string, options: RequestInit, withAuth: boolean): Promise<Response> {
   return fetch(BASE + path, {
     ...options,
+    // Send the httpOnly refresh cookie on same-origin auth calls (login/refresh/logout).
+    credentials: "same-origin",
     headers: {
       "Content-Type": "application/json",
       ...(withAuth && accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
