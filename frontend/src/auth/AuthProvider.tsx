@@ -21,6 +21,9 @@ export interface SignupInput {
   lastName: string;
   phone?: string;
   dateOfBirth?: string;
+  // Optional family-practice clinic to attach to (their "family doctor"). When set,
+  // the patient is registered to it after sign-in so their complaints route there.
+  clinicId?: string;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -95,8 +98,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signupPatient = useCallback(
     async (input: SignupInput) => {
       // Public self-registration creates the patient, then we log them straight in.
-      await api("/patients", { method: "POST", body: JSON.stringify(input) }, { auth: false });
-      return login(input.email, input.password);
+      const { clinicId, ...patient } = input;
+      await api("/patients", { method: "POST", body: JSON.stringify(patient) }, { auth: false });
+      const user = await login(input.email, input.password);
+
+      // Attach to the chosen clinic (now authenticated). Best-effort: a failure here
+      // shouldn't undo a successful signup — the patient can still pick a clinic per visit.
+      if (clinicId) {
+        await api(`/patients/${user.id}/registrations`, {
+          method: "POST",
+          body: JSON.stringify({ clinicId }),
+        }).catch((err) => console.error("Clinic attachment failed", err));
+      }
+      return user;
     },
     [login]
   );

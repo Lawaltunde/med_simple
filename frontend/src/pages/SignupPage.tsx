@@ -1,11 +1,15 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { AuthLayout } from "@/components/AuthLayout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/auth/AuthProvider";
+import { listClinics } from "@/features/clinic/api";
 import { ApiError } from "@/lib/api";
+
+const NO_CLINIC = "";
 
 export function SignupPage() {
   const { signupPatient } = useAuth();
@@ -13,6 +17,7 @@ export function SignupPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { data: clinics } = useQuery({ queryKey: ["clinics"], queryFn: listClinics });
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -25,12 +30,14 @@ export function SignupPage() {
     }
     setSubmitting(true);
     try {
+      const clinicId = String(form.get("clinicId"));
       await signupPatient({
         firstName: String(form.get("firstName")),
         lastName: String(form.get("lastName")),
         email: String(form.get("email")),
         password,
         phone: String(form.get("phone")) || undefined,
+        clinicId: clinicId === NO_CLINIC ? undefined : clinicId,
       });
       navigate("/app", { replace: true });
     } catch (err) {
@@ -56,6 +63,29 @@ export function SignupPage() {
         </div>
         <Input name="email" type="email" label="Email address" placeholder="you@example.com" required autoComplete="email" />
         <Input name="phone" type="tel" label="Phone (optional)" placeholder="416-555-0100" autoComplete="tel" />
+
+        <div className="w-full">
+          <label htmlFor="clinicId" className="mb-1.5 block text-sm font-medium text-ink">
+            Your clinic (optional)
+          </label>
+          <select
+            id="clinicId"
+            name="clinicId"
+            defaultValue={NO_CLINIC}
+            className="h-12 w-full rounded-xl border border-line bg-white px-4 text-[0.95rem] text-ink shadow-sm transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/25"
+          >
+            <option value={NO_CLINIC}>I don't have a family doctor yet</option>
+            {clinics?.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+                {c.city ? ` — ${c.city}` : ""}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1.5 text-sm text-muted">
+            Complaints route to your clinic. No clinic? You can still send to a walk-in later.
+          </p>
+        </div>
 
         <div className="relative">
           <Input

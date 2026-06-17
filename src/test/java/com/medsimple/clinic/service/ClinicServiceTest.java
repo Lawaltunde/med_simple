@@ -54,6 +54,31 @@ class ClinicServiceTest {
                 .build();
     }
 
+    // ── getClinicsForUser (console "my clinics") ─────────────────────────────
+
+    @Test
+    void getClinicsForUser_returnsActiveMemberships() {
+        UUID userId = UUID.randomUUID();
+        ClinicStaff membership = ClinicStaff.builder()
+                .id(UUID.randomUUID()).clinic(sampleClinic)
+                .user(User.builder().id(userId).role(UserRole.PHYSICIAN).build())
+                .role(StaffRole.PHYSICIAN).active(true).build();
+        when(staffRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of(membership));
+
+        List<ClinicResponse> clinics = clinicService.getClinicsForUser(userId);
+
+        assertThat(clinics).singleElement()
+                .satisfies(c -> assertThat(c.id()).isEqualTo(clinicId));
+    }
+
+    @Test
+    void getClinicsForUser_noMemberships_returnsEmpty() {
+        UUID userId = UUID.randomUUID();
+        when(staffRepository.findByUserIdAndActiveTrue(userId)).thenReturn(List.of());
+
+        assertThat(clinicService.getClinicsForUser(userId)).isEmpty();
+    }
+
     // ── createClinic ─────────────────────────────────────────────────────────
 
     @Test
