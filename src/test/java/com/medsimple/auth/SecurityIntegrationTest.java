@@ -78,6 +78,28 @@ class SecurityIntegrationTest {
     }
 
     @Test
+    void refresh_withoutCookie_returns401() {
+        // No refresh cookie present -> rejected before any DB access.
+        HttpStatusCode status = client().post()
+                .uri("/api/v1/auth/refresh")
+                .exchange((req, res) -> res.getStatusCode());
+        assertThat(status.value()).isEqualTo(401);
+    }
+
+    @Test
+    void logout_withoutCookie_returns204AndClearsCookie() {
+        client().post()
+                .uri("/api/v1/auth/logout")
+                .exchange((req, res) -> {
+                    assertThat(res.getStatusCode().value()).isEqualTo(204);
+                    // Always emits a cleared (max-age 0) refresh cookie.
+                    String setCookie = res.getHeaders().getFirst("Set-Cookie");
+                    assertThat(setCookie).contains("ms_refresh=").contains("Max-Age=0");
+                    return null;
+                });
+    }
+
+    @Test
     void patientSelfRegistration_isPublic() {
         HttpStatusCode status = client().post()
                 .uri("/api/v1/patients")
