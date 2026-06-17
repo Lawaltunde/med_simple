@@ -6,6 +6,8 @@ import { LoginPage } from "@/pages/LoginPage";
 import { SignupPage } from "@/pages/SignupPage";
 import { PatientApp } from "@/pages/patient/PatientApp";
 import { PatientHome } from "@/pages/patient/PatientHome";
+import { NewSymptomCheck } from "@/pages/patient/NewSymptomCheck";
+import { EpisodeDetail } from "@/pages/patient/EpisodeDetail";
 
 export function App() {
   return (
@@ -27,7 +29,9 @@ export function App() {
             }
           >
             <Route index element={<PatientHome />} />
-            {/* /app/new, /app/care-plans, … added as those screens are built */}
+            <Route path="new" element={<NewSymptomCheck />} />
+            <Route path="episodes/:id" element={<EpisodeDetail />} />
+            {/* /app/care-plans, /app/prescriptions, … added as those screens are built */}
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
