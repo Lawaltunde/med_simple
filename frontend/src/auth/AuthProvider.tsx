@@ -1,11 +1,10 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
 import { api, tokenStore, registerRefreshHandler } from "@/lib/api";
-import type { AuthResponse, CurrentUser } from "./types";
+import type { AuthTokens, CurrentUser } from "./types";
 
-// Refresh token persists across reloads so a session survives a page refresh.
-// (Access token stays in memory only.) httpOnly cookies would be stronger; the
-// backend returns tokens in JSON, so this is the pragmatic SPA approach.
-const REFRESH_KEY = "medsimple.refreshToken";
+// The refresh token lives in an httpOnly cookie set by the backend, so JS never touches
+// it (XSS can't exfiltrate it). The browser sends it automatically to /api/v1/auth on
+// refresh and logout. Only the short-lived access token is held here, in memory.
 
 interface AuthContextValue {
   user: CurrentUser | null;
@@ -30,28 +29,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [initializing, setInitializing] = useState(true);
 
-  const applyTokens = useCallback((auth: AuthResponse) => {
+  const applyTokens = useCallback((auth: AuthTokens) => {
     tokenStore.set(auth.accessToken);
-    localStorage.setItem(REFRESH_KEY, auth.refreshToken);
   }, []);
 
   const clearSession = useCallback(() => {
     tokenStore.set(null);
-    localStorage.removeItem(REFRESH_KEY);
     setUser(null);
   }, []);
 
-  // Exchange the stored refresh token for a fresh access token. Returns the new
-  // access token (for the api layer's silent retry) or null if the session is dead.
+  // Exchange the httpOnly refresh cookie for a fresh access token. The cookie rides
+  // along automatically; no token is read or sent by JS. Returns the new access token
+  // (for the api layer's silent retry) or null if there is no live session.
   const refresh = useCallback(async (): Promise<string | null> => {
-    const refreshToken = localStorage.getItem(REFRESH_KEY);
-    if (!refreshToken) return null;
     try {
-      const auth = await api<AuthResponse>(
-        "/auth/refresh",
-        { method: "POST", body: JSON.stringify({ refreshToken }) },
-        { auth: false }
-      );
+      const auth = await api<AuthTokens>("/auth/refresh", { method: "POST" }, { auth: false });
       applyTokens(auth);
       return auth.accessToken;
     } catch {
@@ -89,7 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
-      const auth = await api<AuthResponse>(
+      const auth = await api<AuthTokens>(
         "/auth/login",
         { method: "POST", body: JSON.stringify({ email, password }) },
         { auth: false }
@@ -110,12 +102,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    const refreshToken = localStorage.getItem(REFRESH_KEY);
-    if (refreshToken) {
-      await api("/auth/logout", { method: "POST", body: JSON.stringify({ refreshToken }) }, { auth: false }).catch(
-        () => {}
-      );
-    }
+    // Server revokes the refresh token and clears the cookie; JS just drops the access token.
+    await api("/auth/logout", { method: "POST" }, { auth: false }).catch(() => {});
     clearSession();
   }, [clearSession]);
 

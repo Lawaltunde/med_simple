@@ -10,6 +10,7 @@ import com.medsimple.auth.exception.InvalidTokenException;
 import com.medsimple.auth.jwt.JwtService;
 import com.medsimple.auth.repository.RefreshTokenRepository;
 import com.medsimple.auth.repository.UserAccountRepository;
+import com.medsimple.auth.security.LoginRateLimiter;
 import com.medsimple.shared.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,19 +30,24 @@ public class AuthService {
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
+    private final LoginRateLimiter rateLimiter;
 
     @Value("${jwt.refresh-token-ttl-seconds:2592000}") // 30 days
     private long refreshTtlSeconds;
 
     @Transactional
     public AuthResponse login(LoginRequest request, String ipAddress) {
-        User user = userRepository.findByEmail(request.email())
-                .orElseThrow(InvalidCredentialsException::new);
+        // Lockout check first — a locked identifier never reaches credential validation.
+        rateLimiter.assertAllowed(request.email());
 
-        if (!user.isActive() || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+        User user = userRepository.findByEmail(request.email()).orElse(null);
+        if (user == null || !user.isActive()
+                || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            rateLimiter.recordFailure(request.email());
             throw new InvalidCredentialsException();
         }
 
+        rateLimiter.recordSuccess(request.email());
         auditService.log(user.getId(), "LOGIN", "users", user.getId(), ipAddress);
         return issueTokens(user);
     }
@@ -52,8 +58,17 @@ public class AuthService {
         RefreshToken stored = refreshTokenRepository.findByTokenHash(hash)
                 .orElseThrow(() -> new InvalidTokenException("Refresh token not recognized"));
 
-        if (!stored.isActive()) {
-            throw new InvalidTokenException("Refresh token is expired or revoked");
+        // Reuse detection: a presented token that was already rotated out (revoked) means
+        // either a stolen token is being replayed or the legitimate client raced. Either way
+        // it is a compromise signal — revoke every session for the user and force re-login.
+        if (stored.isRevoked()) {
+            UUID userId = stored.getUser().getId();
+            refreshTokenRepository.revokeAllForUser(userId);
+            auditService.log(userId, "REFRESH_TOKEN_REUSE", "refresh_tokens", stored.getId(), null);
+            throw new InvalidTokenException("Refresh token reuse detected; all sessions revoked");
+        }
+        if (stored.getExpiresAt().isBefore(OffsetDateTime.now())) {
+            throw new InvalidTokenException("Refresh token is expired");
         }
 
         // Rotation: revoke the presented token, issue a fresh pair.
