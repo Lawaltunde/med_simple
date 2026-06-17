@@ -34,6 +34,7 @@ class AiTriageServiceTest {
     @Mock SymptomSubmissionRepository submissionRepository;
     @Mock AuditService auditService;
     @Mock com.medsimple.notification.service.NotificationService notificationService;
+    @Mock com.medsimple.auth.security.AccessGuard accessGuard;
 
     @InjectMocks AiTriageService aiTriageService;
 
@@ -66,6 +67,17 @@ class AiTriageServiceTest {
                 .inputType(InputType.TEXT).textContent(text)
                 .processingStatus(ProcessingStatus.COMPLETED)
                 .submittedAt(OffsetDateTime.now()).createdAt(OffsetDateTime.now()).build();
+    }
+
+    @Test
+    void triage_deniedForOtherPatient_neverCallsModel() {
+        when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
+        doThrow(new org.springframework.security.access.AccessDeniedException("denied"))
+                .when(accessGuard).requirePatientSelfOrStaff(patient.getId());
+
+        assertThatThrownBy(() -> aiTriageService.triageEpisode(episodeId))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(aiTriageDao);
     }
 
     @Test
