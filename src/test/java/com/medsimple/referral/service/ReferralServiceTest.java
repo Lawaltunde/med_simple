@@ -1,6 +1,7 @@
 package com.medsimple.referral.service;
 
 import com.medsimple.audit.service.AuditService;
+import com.medsimple.auth.security.AccessGuard;
 import com.medsimple.careplan.entity.CarePlan;
 import com.medsimple.careplan.repository.CarePlanRepository;
 import com.medsimple.clinic.entity.Clinic;
@@ -22,8 +23,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -40,6 +43,7 @@ class ReferralServiceTest {
     @Mock ReferralDeliveryResolver deliveryResolver;
     @Mock ReferralDeliveryDao deliveryDao;
     @Mock AuditService auditService;
+    @Mock AccessGuard accessGuard;
 
     @InjectMocks ReferralService referralService;
 
@@ -182,5 +186,28 @@ class ReferralServiceTest {
 
         assertThatThrownBy(() -> referralService.cancelReferral(ref.getId(), null))
                 .isInstanceOf(InvalidReferralStateException.class);
+    }
+
+    @Test
+    void getPatientReferrals_checksOwnershipThenReturns() {
+        UUID pid = patient.getId();
+        when(referralRepository.findByPatientIdOrderByCreatedAtDesc(pid))
+                .thenReturn(List.of(draft("Cardiology", "Cardiology")));
+
+        List<ReferralResponse> out = referralService.getPatientReferrals(pid);
+
+        assertThat(out).hasSize(1);
+        verify(accessGuard).requirePatientSelfOrStaff(pid);
+    }
+
+    @Test
+    void getPatientReferrals_deniedForAnotherPatient() {
+        UUID pid = patient.getId();
+        doThrow(new AccessDeniedException("not your referrals"))
+                .when(accessGuard).requirePatientSelfOrStaff(pid);
+
+        assertThatThrownBy(() -> referralService.getPatientReferrals(pid))
+                .isInstanceOf(AccessDeniedException.class);
+        verify(referralRepository, never()).findByPatientIdOrderByCreatedAtDesc(any());
     }
 }
