@@ -41,6 +41,7 @@ class PatientServiceTest {
     @Mock PasswordEncoder passwordEncoder;
     @Mock AuditService auditService;
     @Mock EntityManager entityManager;
+    @Mock com.medsimple.auth.security.AccessGuard accessGuard;
 
     @InjectMocks PatientService patientService;
 
@@ -237,6 +238,16 @@ class PatientServiceTest {
         assertThat(response.consentType()).isEqualTo(ConsentType.DATA_PROCESSING);
         assertThat(response.version()).isEqualTo("v1.0");
         assertThat(response.revokedAt()).isNull();
+    }
+
+    @Test
+    void getConsents_deniedForAnotherPatient() {
+        doThrow(new org.springframework.security.access.AccessDeniedException("not yours"))
+                .when(accessGuard).requirePatientSelfOrStaff(userId);
+
+        assertThatThrownBy(() -> patientService.getConsents(userId))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(consentRepository, never()).findByPatientIdOrderByCreatedAtDesc(any());
     }
 
     @Test

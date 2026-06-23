@@ -38,6 +38,9 @@ public class AiTriageService {
     private final AccessGuard accessGuard;
     private final CareSuggestionRepository careSuggestionRepository;
     private final SuggestionGuardrail suggestionGuardrail;
+    private final PlanRetriever planRetriever;
+
+    private static final int RAG_EXEMPLARS = 3;
 
     @Transactional
     public EpisodeResponse triageEpisode(UUID episodeId) {
@@ -50,8 +53,12 @@ public class AiTriageService {
             throw new IllegalStateException("No completed submissions found for episode " + episodeId);
         }
 
-        // PHI-stripped context — only symptom text reaches the model
-        EpisodeContext context = new EpisodeContext(episodeId, symptoms);
+        // Keyword RAG: retrieve physician-approved plans for similar presentations (consented
+        // patients only) to steer the suggestion toward this clinic's practice.
+        List<String> exemplars = planRetriever.retrieveExemplars(String.join(" ", symptoms), RAG_EXEMPLARS);
+
+        // PHI-stripped context — only symptom text and consented approved-plan exemplars.
+        EpisodeContext context = new EpisodeContext(episodeId, symptoms, exemplars);
         TriageResult result = aiTriageDao.analyze(context);
 
         episode.setAiUrgencyLevel(result.urgencyLevel());
