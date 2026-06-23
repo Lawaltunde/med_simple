@@ -1,17 +1,23 @@
 import { Link } from "react-router-dom";
-import { PlusCircle, MessageSquareText, Camera, Mic, ArrowRight, Loader2, ChevronRight } from "lucide-react";
+import { PlusCircle, MessageSquareText, Camera, Mic, ArrowRight, Loader2, ChevronRight, ClipboardList } from "lucide-react";
 import { useAuth } from "@/auth/AuthProvider";
 import { buttonVariants } from "@/components/ui/button";
 import { useEpisodes } from "@/features/symptom/hooks";
 import { effectiveUrgency } from "@/features/symptom/types";
 import { UrgencyBadge, statusLabel, formatDateTime } from "@/features/symptom/display";
+import { usePatientCarePlans } from "@/features/careplan/hooks";
+import { CarePlanStatusBadge } from "@/features/careplan/display";
 
 const RECENT_LIMIT = 5;
 
 export function PatientHome() {
   const { user } = useAuth();
   const { data: episodes, isLoading } = useEpisodes(user?.id);
+  const { data: carePlans } = usePatientCarePlans(user?.id);
   const recent = episodes?.slice(0, RECENT_LIMIT) ?? [];
+  // Surface plans the physician is still working with the patient on, so a new
+  // response is visible the moment polling refreshes the dashboard.
+  const activePlans = carePlans?.filter((p) => p.status === "ACTIVE") ?? [];
 
   return (
     <div className="mx-auto max-w-4xl space-y-8">
@@ -30,6 +36,35 @@ export function PatientHome() {
           <PlusCircle className="size-5" /> Start a new symptom check
         </Link>
       </section>
+
+      {/* Active care plans — only shown when a physician has an open plan. */}
+      {activePlans.length > 0 && (
+        <section>
+          <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted">From your physician</h3>
+          <ul className="space-y-3">
+            {activePlans.map((p) => (
+              <li key={p.id}>
+                <Link
+                  to={`/app/care-plans/${p.id}`}
+                  className="flex items-center gap-4 rounded-2xl border border-brand-200 bg-brand-50/50 p-4 transition-colors hover:border-brand-300 hover:bg-brand-50"
+                >
+                  <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-600">
+                    <ClipboardList className="size-5" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-ink">Care plan</p>
+                      <CarePlanStatusBadge status={p.status} />
+                    </div>
+                    <p className="mt-0.5 truncate text-sm text-muted">{p.notes ?? "Open the plan to read it"}</p>
+                  </div>
+                  <ChevronRight className="size-4 shrink-0 text-muted" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* Three ways to ask */}
       <section>
