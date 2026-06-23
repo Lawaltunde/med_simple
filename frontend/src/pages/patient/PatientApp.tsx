@@ -1,4 +1,4 @@
-import { Home, PlusCircle, ClipboardList, Pill, FlaskConical, Bell } from "lucide-react";
+import { Home, PlusCircle, ClipboardList, Pill, FlaskConical, Send, Bell } from "lucide-react";
 import { AppShell, type NavItem } from "@/components/AppShell";
 import { useAuth } from "@/auth/AuthProvider";
 import { useUnreadCount } from "@/features/notifications/hooks";
@@ -9,6 +9,7 @@ const patientNav: NavItem[] = [
   { label: "Care plans", to: "/app/care-plans", icon: ClipboardList },
   { label: "Prescriptions", to: "/app/prescriptions", icon: Pill },
   { label: "Test results", to: "/app/results", icon: FlaskConical },
+  { label: "Referrals", to: "/app/referrals", icon: Send },
   { label: "Notifications", to: "/app/notifications", icon: Bell },
 ];
 
