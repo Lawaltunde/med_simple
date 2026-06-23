@@ -40,6 +40,13 @@ vi.mock("@/features/clinician/hooks", () => ({
   useAssignToMe: () => ({ mutate: assignMutate, isPending: false, error: null }),
 }));
 
+// Care-plan card is out of scope here; stub its hooks (no plan yet -> create form).
+vi.mock("@/features/careplan/hooks", () => ({
+  usePatientCarePlans: () => ({ data: [], isLoading: false }),
+  useCreateCarePlan: () => ({ mutate: vi.fn(), isPending: false }),
+  useUpdateCarePlan: () => ({ mutate: vi.fn(), isPending: false }),
+}));
+
 function renderReview() {
   return render(
     <MemoryRouter initialEntries={["/console/episodes/ep1"]}>

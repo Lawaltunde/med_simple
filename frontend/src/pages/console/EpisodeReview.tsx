@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { Link, useParams, useLocation } from "react-router-dom";
-import { ArrowLeft, Loader2, Sparkles, UserCheck, CheckCircle2, AlertCircle } from "lucide-react";
+import { ArrowLeft, Loader2, Sparkles, UserCheck, CheckCircle2, AlertCircle, ClipboardList } from "lucide-react";
 import { useAuth } from "@/auth/AuthProvider";
 import { useEpisode } from "@/features/symptom/hooks";
 import { effectiveUrgency, type Episode, type UrgencyLevel } from "@/features/symptom/types";
 import { UrgencyBadge, urgencyMeta, statusLabel, formatDateTime } from "@/features/symptom/display";
 import { useAssignToMe, useConfirmUrgency } from "@/features/clinician/hooks";
+import { usePatientCarePlans, useCreateCarePlan, useUpdateCarePlan } from "@/features/careplan/hooks";
+import { CarePlanStatusBadge } from "@/features/careplan/display";
+import { FollowUpThread } from "@/features/careplan/FollowUpThread";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api";
@@ -76,9 +79,86 @@ export function EpisodeReview() {
 
           <AssignCard episode={episode} episodeId={id} />
           <ConfirmUrgencyCard episode={episode} episodeId={id} />
+          <CarePlanCard episode={episode} episodeId={id} />
         </div>
       )}
     </div>
+  );
+}
+
+function CarePlanCard({ episode, episodeId }: { episode: Episode; episodeId: string }) {
+  const { user } = useAuth();
+  const { data: plans, isLoading } = usePatientCarePlans(episode.patientId);
+  const create = useCreateCarePlan();
+  const update = useUpdateCarePlan();
+  const [notes, setNotes] = useState("");
+
+  const plan = plans?.find((p) => p.episodeId === episodeId);
+
+  if (isLoading) {
+    return (
+      <section className="rounded-2xl border border-line bg-white p-6">
+        <div className="flex items-center gap-2 text-muted"><Loader2 className="size-4 animate-spin" /> Loading care plan…</div>
+      </section>
+    );
+  }
+
+  // No plan yet — author one. Creating it moves the episode to IN_PROGRESS.
+  if (!plan) {
+    const tooShort = notes.trim().length < 5;
+    return (
+      <section className="rounded-2xl border border-line bg-white p-6">
+        <h3 className="flex items-center gap-2 font-bold text-brand-900">
+          <ClipboardList className="size-4 text-brand-600" /> Create care plan
+        </h3>
+        <p className="mt-1 text-sm text-muted">Write the plan and instructions. The patient is notified and can reply.</p>
+        <Textarea
+          name="notes"
+          className="mt-4"
+          rows={4}
+          placeholder="e.g. Likely viral pharyngitis. Rest, fluids, acetaminophen as needed. Return if fever > 39°C or symptoms persist past 5 days."
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          disabled={create.isPending}
+        />
+        <Button
+          className="mt-4"
+          disabled={create.isPending || tooShort || !user}
+          onClick={() => user && create.mutate({ episodeId, physicianId: user.id, notes: notes.trim() })}
+        >
+          {create.isPending ? <Loader2 className="size-4 animate-spin" /> : <ClipboardList className="size-4" />}
+          Create care plan
+        </Button>
+      </section>
+    );
+  }
+
+  // Plan exists — show it, allow completion (resolves the episode), and message the patient.
+  return (
+    <section className="space-y-5 rounded-2xl border border-line bg-white p-6">
+      <div className="flex items-center justify-between">
+        <h3 className="flex items-center gap-2 font-bold text-brand-900">
+          <ClipboardList className="size-4 text-brand-600" /> Care plan
+        </h3>
+        <CarePlanStatusBadge status={plan.status} />
+      </div>
+      <p className="whitespace-pre-line text-[0.95rem] leading-relaxed text-ink">{plan.notes}</p>
+
+      {plan.status === "ACTIVE" && (
+        <Button
+          variant="outline"
+          disabled={update.isPending}
+          onClick={() => update.mutate({ id: plan.id, status: "COMPLETED" })}
+        >
+          {update.isPending ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+          Mark complete (resolves & clears the queue)
+        </Button>
+      )}
+
+      <div className="border-t border-line pt-5">
+        {user && <FollowUpThread plan={plan} currentUserId={user.id} />}
+      </div>
+    </section>
   );
 }
 
