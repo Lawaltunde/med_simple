@@ -238,4 +238,34 @@ class PatientServiceTest {
         assertThat(response.version()).isEqualTo("v1.0");
         assertThat(response.revokedAt()).isNull();
     }
+
+    @Test
+    void hasActiveConsent_trueWhenLatestEventIsGrant() {
+        PatientConsent grant = PatientConsent.builder()
+                .consentType(ConsentType.AI_TRAINING).version("v1.0")
+                .grantedAt(OffsetDateTime.now()).build();
+        when(consentRepository.findFirstByPatientIdAndConsentTypeOrderByCreatedAtDesc(userId, ConsentType.AI_TRAINING))
+                .thenReturn(Optional.of(grant));
+
+        assertThat(patientService.hasActiveConsent(userId, ConsentType.AI_TRAINING)).isTrue();
+    }
+
+    @Test
+    void hasActiveConsent_falseWhenLatestEventIsRevoke() {
+        PatientConsent revoke = PatientConsent.builder()
+                .consentType(ConsentType.AI_TRAINING).version("v1.0")
+                .grantedAt(OffsetDateTime.now().minusDays(2)).revokedAt(OffsetDateTime.now()).build();
+        when(consentRepository.findFirstByPatientIdAndConsentTypeOrderByCreatedAtDesc(userId, ConsentType.AI_TRAINING))
+                .thenReturn(Optional.of(revoke));
+
+        assertThat(patientService.hasActiveConsent(userId, ConsentType.AI_TRAINING)).isFalse();
+    }
+
+    @Test
+    void hasActiveConsent_falseWhenNoConsentRecorded() {
+        when(consentRepository.findFirstByPatientIdAndConsentTypeOrderByCreatedAtDesc(userId, ConsentType.AI_TRAINING))
+                .thenReturn(Optional.empty());
+
+        assertThat(patientService.hasActiveConsent(userId, ConsentType.AI_TRAINING)).isFalse();
+    }
 }
