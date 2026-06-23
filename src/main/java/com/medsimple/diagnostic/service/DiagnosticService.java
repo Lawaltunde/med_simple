@@ -1,6 +1,7 @@
 package com.medsimple.diagnostic.service;
 
 import com.medsimple.audit.service.AuditService;
+import com.medsimple.auth.security.AccessGuard;
 import com.medsimple.careplan.entity.CarePlan;
 import com.medsimple.careplan.exception.CarePlanNotFoundException;
 import com.medsimple.careplan.repository.CarePlanRepository;
@@ -29,6 +30,7 @@ public class DiagnosticService {
     private final ResultSummaryDao resultSummaryDao;
     private final AuditService auditService;
     private final com.medsimple.notification.service.NotificationService notificationService;
+    private final AccessGuard accessGuard;
 
     // ── Requisition lifecycle ───────────────────────────────────────────────────
 
@@ -195,6 +197,10 @@ public class DiagnosticService {
 
     @Transactional(readOnly = true)
     public List<PatientResultResponse> getPatientReleasedResults(UUID patientId) {
+        // Patient-scoped read: a patient may see only their own released results;
+        // staff may see any. The release gate (releasedToPatientAt) controls WHAT is
+        // visible; this controls WHOSE — without it any patient could read another's.
+        accessGuard.requirePatientSelfOrStaff(patientId);
         return resultRepository
                 .findByPatientIdAndReleasedToPatientAtIsNotNullOrderByReceivedAtDesc(patientId)
                 .stream().map(this::toPatientResponse).toList();
