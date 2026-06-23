@@ -9,6 +9,9 @@ import { useAssignToMe, useConfirmUrgency } from "@/features/clinician/hooks";
 import { usePatientCarePlans, useCreateCarePlan, useUpdateCarePlan } from "@/features/careplan/hooks";
 import { CarePlanStatusBadge } from "@/features/careplan/display";
 import { FollowUpThread } from "@/features/careplan/FollowUpThread";
+import { PrescriptionCard } from "@/features/prescription/PrescriptionCard";
+import { DiagnosticCard } from "@/features/diagnostic/DiagnosticCard";
+import { ReferralCard } from "@/features/referral/ReferralCard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api";
@@ -80,6 +83,10 @@ export function EpisodeReview() {
           <AssignCard episode={episode} episodeId={id} />
           <ConfirmUrgencyCard episode={episode} episodeId={id} />
           <CarePlanCard episode={episode} episodeId={id} />
+          {/* Workstream slots — each renders null until its branch lands. */}
+          <PrescriptionCard episode={episode} episodeId={id} />
+          <DiagnosticCard episode={episode} episodeId={id} />
+          <ReferralCard episode={episode} episodeId={id} />
         </div>
       )}
     </div>
