@@ -38,6 +38,11 @@ public class ReferralController {
         return ResponseEntity.ok(referralService.getCarePlanReferrals(carePlanId));
     }
 
+    @GetMapping("/api/v1/patients/{patientId}/referrals")
+    public ResponseEntity<List<ReferralResponse>> getForPatient(@PathVariable UUID patientId) {
+        return ResponseEntity.ok(referralService.getPatientReferrals(patientId));
+    }
+
     @PreAuthorize("hasRole('PHYSICIAN')")
     @PostMapping("/api/v1/referrals/{id}/confirm-specialty")
     public ResponseEntity<ReferralResponse> confirmSpecialty(@PathVariable UUID id,
