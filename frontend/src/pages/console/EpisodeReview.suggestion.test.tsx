@@ -31,6 +31,7 @@ vi.mock("@/features/clinician/hooks", () => ({
 vi.mock("@/features/prescription/PrescriptionCard", () => ({ PrescriptionCard: () => null }));
 vi.mock("@/features/diagnostic/DiagnosticCard", () => ({ DiagnosticCard: () => null }));
 vi.mock("@/features/referral/ReferralCard", () => ({ ReferralCard: () => null }));
+vi.mock("@/features/appointment/BookAppointmentCard", () => ({ BookAppointmentCard: () => null }));
 
 const approveMutate = vi.fn();
 const rejectMutate = vi.fn();
