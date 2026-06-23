@@ -33,6 +33,7 @@ public class PatientService {
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
     private final EntityManager entityManager;
+    private final com.medsimple.auth.security.AccessGuard accessGuard;
 
     @Transactional
     public PatientResponse createPatient(CreatePatientRequest request, String ipAddress) {
@@ -169,6 +170,7 @@ public class PatientService {
 
     @Transactional
     public ConsentResponse recordConsent(UUID patientId, RecordConsentRequest request, String ipAddress) {
+        accessGuard.requirePatientSelfOrStaff(patientId); // consent is the patient's own to give
         User patient = findPatientById(patientId);
 
         PatientConsent consent = PatientConsent.builder()
@@ -188,6 +190,7 @@ public class PatientService {
 
     @Transactional(readOnly = true)
     public List<ConsentResponse> getConsents(UUID patientId) {
+        accessGuard.requirePatientSelfOrStaff(patientId);
         findPatientById(patientId);
         return consentRepository.findByPatientIdOrderByCreatedAtDesc(patientId)
                 .stream()

@@ -14,6 +14,7 @@ import { NotificationsPage } from "@/pages/patient/NotificationsPage";
 import { PrescriptionsPage } from "@/pages/patient/PrescriptionsPage";
 import { ResultsPage } from "@/pages/patient/ResultsPage";
 import { ReferralsPage } from "@/pages/patient/ReferralsPage";
+import { PrivacyPage } from "@/pages/patient/PrivacyPage";
 import { ComingSoon } from "@/pages/patient/ComingSoon";
 import { ConsoleApp } from "@/pages/console/ConsoleApp";
 import { QueuePage } from "@/pages/console/QueuePage";
@@ -52,6 +53,7 @@ export function App() {
             <Route path="results" element={<ResultsPage />} />
             <Route path="referrals" element={<ReferralsPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
+            <Route path="privacy" element={<PrivacyPage />} />
             {/* Unknown /app/* path stays in the shell rather than bouncing to the landing page. */}
             <Route path="*" element={<ComingSoon title="This page" description="That section isn't available yet." />} />
           </Route>
