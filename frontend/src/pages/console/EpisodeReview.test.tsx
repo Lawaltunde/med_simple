@@ -47,6 +47,13 @@ vi.mock("@/features/careplan/hooks", () => ({
   useUpdateCarePlan: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
+// The prescription/diagnostic/referral cards have their own test suites and pull in
+// their own React Query hooks. This test covers the console's own logic (assign /
+// confirm / care plan), so stub the feature cards to null to keep it isolated.
+vi.mock("@/features/prescription/PrescriptionCard", () => ({ PrescriptionCard: () => null }));
+vi.mock("@/features/diagnostic/DiagnosticCard", () => ({ DiagnosticCard: () => null }));
+vi.mock("@/features/referral/ReferralCard", () => ({ ReferralCard: () => null }));
+
 function renderReview() {
   return render(
     <MemoryRouter initialEntries={["/console/episodes/ep1"]}>
