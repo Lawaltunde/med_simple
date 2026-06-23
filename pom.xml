@@ -28,6 +28,9 @@
     </scm>
     <properties>
         <java.version>17</java.version>
+        <!-- Test lanes: gate run excludes the paid eval lane; -Pevals flips these. -->
+        <surefire.groups></surefire.groups>
+        <surefire.excludedGroups>eval</surefire.excludedGroups>
     </properties>
 
     <dependencyManagement>
@@ -214,6 +217,10 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
                     <argLine>-XX:+EnableDynamicAgentLoading</argLine>
+                    <!-- Gate lane: deterministic, free, every commit. The paid LLM eval lane
+                         (@Tag("eval")) is excluded here and run via `-Pevals`. -->
+                    <groups>${surefire.groups}</groups>
+                    <excludedGroups>${surefire.excludedGroups}</excludedGroups>
                 </configuration>
             </plugin>
         </plugins>
@@ -260,6 +267,20 @@
                     </plugin>
                 </plugins>
             </build>
+        </profile>
+
+        <!--
+          Paid eval lane. Runs ONLY the @Tag("eval") quality evals (LLM-as-judge against a
+          labelled set), which call OpenAI. Run before ship / nightly, not on every commit:
+            ./mvnw test -Pevals -Dspring-boot.run.profiles=local
+          Requires the local OpenAI key (application-local.properties) and the dev DB up.
+        -->
+        <profile>
+            <id>evals</id>
+            <properties>
+                <surefire.groups>eval</surefire.groups>
+                <surefire.excludedGroups></surefire.excludedGroups>
+            </properties>
         </profile>
     </profiles>
 
