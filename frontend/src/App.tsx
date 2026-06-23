@@ -10,6 +10,7 @@ import { NewSymptomCheck } from "@/pages/patient/NewSymptomCheck";
 import { EpisodeDetail } from "@/pages/patient/EpisodeDetail";
 import { CarePlansPage } from "@/pages/patient/CarePlansPage";
 import { CarePlanDetail } from "@/pages/patient/CarePlanDetail";
+import { NotificationsPage } from "@/pages/patient/NotificationsPage";
 import { ComingSoon } from "@/pages/patient/ComingSoon";
 import { ConsoleApp } from "@/pages/console/ConsoleApp";
 import { QueuePage } from "@/pages/console/QueuePage";
@@ -45,7 +46,7 @@ export function App() {
             {/* Navigable but not built yet — placeholders so the sidebar never dead-ends. */}
             <Route path="prescriptions" element={<ComingSoon title="Prescriptions" />} />
             <Route path="results" element={<ComingSoon title="Test results" />} />
-            <Route path="notifications" element={<ComingSoon title="Notifications" />} />
+            <Route path="notifications" element={<NotificationsPage />} />
             {/* Unknown /app/* path stays in the shell rather than bouncing to the landing page. */}
             <Route path="*" element={<ComingSoon title="This page" description="That section isn't available yet." />} />
           </Route>

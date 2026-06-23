@@ -34,6 +34,7 @@ class NotificationServiceTest {
     @Mock NotificationRepository notificationRepository;
     @Mock EmailDeliveryDao emailDeliveryDao;
     @Mock EntityManager entityManager;
+    @Mock com.medsimple.auth.security.AccessGuard accessGuard;
 
     @InjectMocks NotificationService notificationService;
 
@@ -47,6 +48,18 @@ class NotificationServiceTest {
         userId = UUID.randomUUID();
         user = User.builder().id(userId).role(UserRole.PATIENT)
                 .firstName("Jane").lastName("Doe").email("jane@example.com").build();
+    }
+
+    // ── ownership gate ──────────────────────────────────────────────────────────
+
+    @Test
+    void getFeed_deniedForAnotherUser() {
+        doThrow(new org.springframework.security.access.AccessDeniedException("denied"))
+                .when(accessGuard).requireSelf(userId);
+
+        assertThatThrownBy(() -> notificationService.getFeed(userId))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(notificationRepository);
     }
 
     // ── notify() — dual-channel ─────────────────────────────────────────────────
