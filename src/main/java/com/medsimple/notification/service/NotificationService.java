@@ -1,5 +1,6 @@
 package com.medsimple.notification.service;
 
+import com.medsimple.auth.security.AccessGuard;
 import com.medsimple.notification.dao.EmailDeliveryDao;
 import com.medsimple.notification.dto.NotificationResponse;
 import com.medsimple.notification.entity.Notification;
@@ -26,6 +27,7 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final EmailDeliveryDao emailDeliveryDao;
     private final EntityManager entityManager;
+    private final AccessGuard accessGuard;
 
     /**
      * The contract every other service calls. Produces both an IN_APP row (available
@@ -64,6 +66,7 @@ public class NotificationService {
 
     @Transactional(readOnly = true)
     public List<NotificationResponse> getFeed(UUID userId) {
+        accessGuard.requireSelf(userId);
         return notificationRepository
                 .findByUserIdAndChannelOrderByCreatedAtDesc(userId, NotificationChannel.IN_APP)
                 .stream().map(this::toResponse).toList();
@@ -71,6 +74,7 @@ public class NotificationService {
 
     @Transactional(readOnly = true)
     public List<NotificationResponse> getUnread(UUID userId) {
+        accessGuard.requireSelf(userId);
         return notificationRepository
                 .findByUserIdAndChannelAndReadAtIsNullOrderByCreatedAtDesc(userId, NotificationChannel.IN_APP)
                 .stream().map(this::toResponse).toList();
@@ -78,11 +82,13 @@ public class NotificationService {
 
     @Transactional(readOnly = true)
     public long unreadCount(UUID userId) {
+        accessGuard.requireSelf(userId);
         return notificationRepository.countByUserIdAndChannelAndReadAtIsNull(userId, NotificationChannel.IN_APP);
     }
 
     @Transactional
     public NotificationResponse markAsRead(UUID userId, UUID notificationId) {
+        accessGuard.requireSelf(userId);
         Notification n = notificationRepository.findByIdAndUserId(notificationId, userId)
                 .orElseThrow(() -> new NotificationNotFoundException(notificationId));
         if (n.getReadAt() == null) {
@@ -94,6 +100,7 @@ public class NotificationService {
 
     @Transactional
     public int markAllAsRead(UUID userId) {
+        accessGuard.requireSelf(userId);
         List<Notification> unread = notificationRepository
                 .findByUserIdAndChannelAndReadAtIsNullOrderByCreatedAtDesc(userId, NotificationChannel.IN_APP);
         OffsetDateTime now = OffsetDateTime.now();

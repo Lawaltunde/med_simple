@@ -15,11 +15,15 @@ export const carePlanKeys = {
   detail: (id: string) => ["care-plans", "detail", id] as const,
 };
 
+// Poll so a newly created plan / new message appears without a manual refresh.
+const POLL_MS = 30_000;
+
 export function usePatientCarePlans(patientId: string | undefined) {
   return useQuery({
     queryKey: carePlanKeys.forPatient(patientId ?? ""),
     queryFn: () => listPatientCarePlans(patientId!),
     enabled: !!patientId,
+    refetchInterval: POLL_MS,
   });
 }
 
@@ -28,6 +32,7 @@ export function useCarePlan(id: string | undefined) {
     queryKey: carePlanKeys.detail(id ?? ""),
     queryFn: () => getCarePlan(id!),
     enabled: !!id,
+    refetchInterval: POLL_MS,
   });
 }
 

@@ -8,11 +8,15 @@ export const episodeKeys = {
   detail: (episodeId: string) => ["episodes", "detail", episodeId] as const,
 };
 
+// Poll so triage results and physician status changes surface without a manual refresh.
+const POLL_MS = 30_000;
+
 export function useEpisodes(patientId: string | undefined) {
   return useQuery({
     queryKey: episodeKeys.list(patientId ?? ""),
     queryFn: () => listEpisodes(patientId!),
     enabled: !!patientId,
+    refetchInterval: POLL_MS,
   });
 }
 
@@ -21,6 +25,7 @@ export function useEpisode(episodeId: string | undefined) {
     queryKey: episodeKeys.detail(episodeId ?? ""),
     queryFn: () => getEpisode(episodeId!),
     enabled: !!episodeId,
+    refetchInterval: POLL_MS,
   });
 }
 

@@ -10,6 +10,7 @@ export interface NavItem {
   to: string;
   icon: LucideIcon;
   end?: boolean;
+  badge?: number; // unread count shown on the nav item
 }
 
 // Reusable authenticated shell. Patient app and clinician console pass their own
@@ -123,10 +124,19 @@ function SidebarBody({
             {({ isActive }) => (
               <>
                 {isActive && <span className="absolute left-0 h-6 w-1 rounded-r-full bg-brand-600" />}
-                <span className="grid w-[3.25rem] shrink-0 place-content-center">
+                <span className="relative grid w-[3.25rem] shrink-0 place-content-center">
                   <item.icon className="size-5" />
+                  {/* Collapsed: a dot marks unread; expanded: a count pill follows the label. */}
+                  {!!item.badge && collapsed && (
+                    <span className="absolute right-3 top-1 size-2 rounded-full bg-brand-600" aria-label={`${item.badge} unread`} />
+                  )}
                 </span>
                 {!collapsed && <span className="text-sm">{item.label}</span>}
+                {!!item.badge && !collapsed && (
+                  <span className="ml-auto mr-3 inline-flex min-w-5 items-center justify-center rounded-full bg-brand-600 px-1.5 text-xs font-bold text-white">
+                    {item.badge > 99 ? "99+" : item.badge}
+                  </span>
+                )}
               </>
             )}
           </NavLink>
