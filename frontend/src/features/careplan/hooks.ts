@@ -2,9 +2,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { episodeKeys } from "@/features/symptom/hooks";
 import {
   addFollowUp,
+  approveSuggestion,
   createCarePlan,
   getCarePlan,
+  getEpisodeSuggestion,
   listPatientCarePlans,
+  rejectSuggestion,
   respondToFollowUp,
   updateCarePlan,
 } from "./api";
@@ -13,6 +16,7 @@ import type { CarePlanStatus } from "./types";
 export const carePlanKeys = {
   forPatient: (patientId: string) => ["care-plans", "patient", patientId] as const,
   detail: (id: string) => ["care-plans", "detail", id] as const,
+  suggestion: (episodeId: string) => ["care-suggestion", episodeId] as const,
 };
 
 // Poll so a newly created plan / new message appears without a manual refresh.
@@ -79,5 +83,37 @@ export function useRespondToFollowUp(carePlanId: string, patientId: string) {
     mutationFn: (input: { followUpId: string; respondedBy: string; response: string }) =>
       respondToFollowUp(carePlanId, input.followUpId, { respondedBy: input.respondedBy, response: input.response }),
     onSuccess: () => invalidate({ carePlanId, patientId }),
+  });
+}
+
+// ── AI care suggestion (physician review) ──────────────────────────────────
+
+export function useEpisodeSuggestion(episodeId: string | undefined) {
+  return useQuery({
+    queryKey: carePlanKeys.suggestion(episodeId ?? ""),
+    queryFn: () => getEpisodeSuggestion(episodeId!),
+    enabled: !!episodeId,
+  });
+}
+
+export function useApproveSuggestion(episodeId: string, patientId: string) {
+  const invalidate = useCarePlanInvalidation();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; physicianId: string; editedNotes?: string }) =>
+      approveSuggestion(input.id, { physicianId: input.physicianId, editedNotes: input.editedNotes }),
+    onSuccess: (plan) => {
+      invalidate({ patientId, episodeId, carePlanId: plan.id });
+      qc.invalidateQueries({ queryKey: carePlanKeys.suggestion(episodeId) });
+    },
+  });
+}
+
+export function useRejectSuggestion(episodeId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; physicianId: string; reason?: string }) =>
+      rejectSuggestion(input.id, { physicianId: input.physicianId, reason: input.reason }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: carePlanKeys.suggestion(episodeId) }),
   });
 }

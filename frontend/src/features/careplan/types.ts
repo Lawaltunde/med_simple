@@ -25,3 +25,18 @@ export interface CarePlan {
   updatedAt: string;
   followUps: FollowUp[];
 }
+
+// AI-proposed plan of care (staff-only). The patient never sees this — only a
+// physician-approved care plan reaches them.
+export type CareSuggestionStatus = "PROPOSED" | "APPROVED" | "EDITED" | "REJECTED" | "FAILED";
+
+export interface CareSuggestion {
+  id: string;
+  episodeId: string;
+  status: CareSuggestionStatus;
+  suggestedPlan: string | null;
+  rationale: string | null;
+  adapter: string;
+  model: string | null;
+  createdAt: string;
+}
