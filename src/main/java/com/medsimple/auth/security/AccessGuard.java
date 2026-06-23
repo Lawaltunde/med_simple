@@ -44,6 +44,16 @@ public class AccessGuard {
         }
     }
 
+    /**
+     * Strictly personal access: the caller may act only on their own {@code userId}, with
+     * no staff bypass (e.g. a notification feed — nobody reads someone else's).
+     */
+    public void requireSelf(UUID userId) {
+        if (!currentUserId().equals(userId)) {
+            throw new AccessDeniedException("You can only access your own data");
+        }
+    }
+
     /** Staff-only action: deny patients outright (e.g. AI processing callbacks). */
     public void requireStaff() {
         if (isPatient()) {

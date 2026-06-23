@@ -1,5 +1,7 @@
 import { Home, PlusCircle, ClipboardList, Pill, FlaskConical, Bell } from "lucide-react";
 import { AppShell, type NavItem } from "@/components/AppShell";
+import { useAuth } from "@/auth/AuthProvider";
+import { useUnreadCount } from "@/features/notifications/hooks";
 
 const patientNav: NavItem[] = [
   { label: "Home", to: "/app", icon: Home, end: true },
@@ -11,5 +13,13 @@ const patientNav: NavItem[] = [
 ];
 
 export function PatientApp() {
-  return <AppShell nav={patientNav} title="MedSimple" />;
+  const { user } = useAuth();
+  const { data: unread } = useUnreadCount(user?.id);
+
+  // Surface the live unread count on the Notifications item.
+  const nav = patientNav.map((item) =>
+    item.to === "/app/notifications" ? { ...item, badge: unread } : item
+  );
+
+  return <AppShell nav={nav} title="MedSimple" />;
 }
