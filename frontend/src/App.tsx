@@ -11,6 +11,9 @@ import { EpisodeDetail } from "@/pages/patient/EpisodeDetail";
 import { CarePlansPage } from "@/pages/patient/CarePlansPage";
 import { CarePlanDetail } from "@/pages/patient/CarePlanDetail";
 import { NotificationsPage } from "@/pages/patient/NotificationsPage";
+import { PrescriptionsPage } from "@/pages/patient/PrescriptionsPage";
+import { ResultsPage } from "@/pages/patient/ResultsPage";
+import { ReferralsPage } from "@/pages/patient/ReferralsPage";
 import { ComingSoon } from "@/pages/patient/ComingSoon";
 import { ConsoleApp } from "@/pages/console/ConsoleApp";
 import { QueuePage } from "@/pages/console/QueuePage";
@@ -43,9 +46,11 @@ export function App() {
             <Route path="episodes/:id" element={<EpisodeDetail />} />
             <Route path="care-plans" element={<CarePlansPage />} />
             <Route path="care-plans/:id" element={<CarePlanDetail />} />
-            {/* Navigable but not built yet — placeholders so the sidebar never dead-ends. */}
-            <Route path="prescriptions" element={<ComingSoon title="Prescriptions" />} />
-            <Route path="results" element={<ComingSoon title="Test results" />} />
+            {/* Feature pages — stubs land first via the shell-contract scaffold, then each
+                workstream replaces its page body on its own branch. */}
+            <Route path="prescriptions" element={<PrescriptionsPage />} />
+            <Route path="results" element={<ResultsPage />} />
+            <Route path="referrals" element={<ReferralsPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
             {/* Unknown /app/* path stays in the shell rather than bouncing to the landing page. */}
             <Route path="*" element={<ComingSoon title="This page" description="That section isn't available yet." />} />
