@@ -43,6 +43,7 @@ class AiTriageServiceTest {
     @Mock com.medsimple.auth.security.AccessGuard accessGuard;
     @Mock CareSuggestionRepository careSuggestionRepository;
     @Mock SuggestionGuardrail suggestionGuardrail;
+    @Mock PlanRetriever planRetriever;
 
     @InjectMocks AiTriageService aiTriageService;
 
@@ -74,6 +75,8 @@ class AiTriageServiceTest {
             if (c.getId() == null) c.setId(UUID.randomUUID());
             return c;
         });
+        // RAG retrieval is exercised in PlanRetrieverTest; default to no exemplars here.
+        lenient().when(planRetriever.retrieveExemplars(anyString(), anyInt())).thenReturn(List.of());
     }
 
     private SymptomSubmission textSubmission(String text) {
@@ -262,5 +265,18 @@ class AiTriageServiceTest {
         assertThat(saved.getRejectReason()).isEqualTo("NO_PLAN");
         assertThat(saved.getSuggestedPlan()).isNull();
         verifyNoInteractions(suggestionGuardrail);
+    }
+
+    @Test
+    void triage_passesRetrievedExemplarsIntoModelContext() {
+        when(planRetriever.retrieveExemplars(anyString(), anyInt()))
+                .thenReturn(List.of("Approved plan: supportive care and safety-net advice."));
+        stubTriage(new TriageResult(UrgencyLevel.ROUTINE, "Routine."));
+
+        aiTriageService.triageEpisode(episodeId);
+
+        verify(aiTriageDao).analyze(argThat(ctx ->
+                ctx.approvedPlanExamples().size() == 1
+                        && ctx.approvedPlanExamples().get(0).contains("supportive care")));
     }
 }

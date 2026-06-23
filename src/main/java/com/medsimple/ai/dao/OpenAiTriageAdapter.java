@@ -61,10 +61,23 @@ public class OpenAiTriageAdapter implements AiTriageDao {
 
     @Override
     public TriageResult analyze(EpisodeContext context) {
-        String userMessage = "Patient-reported symptoms:\n- " + String.join("\n- ", context.symptoms());
+        StringBuilder userMessage = new StringBuilder("Patient-reported symptoms:\n- ")
+                .append(String.join("\n- ", context.symptoms()));
+
+        // Keyword-RAG exemplars: physician-approved plans this clinic used for similar
+        // presentations. Guidance, not text to copy — the same hard rules still apply.
+        if (context.approvedPlanExamples() != null && !context.approvedPlanExamples().isEmpty()) {
+            userMessage.append("\n\nFor reference, plans physicians at this clinic approved for ")
+                    .append("similar presentations (match their clinical approach and style; do not ")
+                    .append("copy verbatim, and never include a specific drug, dose, or prescription):");
+            for (String ex : context.approvedPlanExamples()) {
+                userMessage.append("\n- ").append(ex);
+            }
+        }
+
         try {
             return chatClient.prompt()
-                    .user(userMessage)
+                    .user(userMessage.toString())
                     .call()
                     .entity(TriageResult.class);
         } catch (Exception e) {
