@@ -38,6 +38,11 @@ public class PrescriptionController {
         return ResponseEntity.ok(prescriptionService.getCarePlanPrescriptions(carePlanId));
     }
 
+    @GetMapping("/api/v1/patients/{patientId}/prescriptions")
+    public ResponseEntity<List<PrescriptionResponse>> getForPatient(@PathVariable UUID patientId) {
+        return ResponseEntity.ok(prescriptionService.getPatientPrescriptions(patientId));
+    }
+
     @PreAuthorize("hasRole('PHYSICIAN')")
     @PostMapping("/api/v1/prescriptions/{id}/sign")
     public ResponseEntity<PrescriptionResponse> sign(@PathVariable UUID id, HttpServletRequest httpRequest) {
