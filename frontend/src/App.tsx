@@ -15,10 +15,12 @@ import { PrescriptionsPage } from "@/pages/patient/PrescriptionsPage";
 import { ResultsPage } from "@/pages/patient/ResultsPage";
 import { ReferralsPage } from "@/pages/patient/ReferralsPage";
 import { PrivacyPage } from "@/pages/patient/PrivacyPage";
+import { AppointmentsPage } from "@/pages/patient/AppointmentsPage";
 import { ComingSoon } from "@/pages/patient/ComingSoon";
 import { ConsoleApp } from "@/pages/console/ConsoleApp";
 import { QueuePage } from "@/pages/console/QueuePage";
 import { EpisodeReview } from "@/pages/console/EpisodeReview";
+import { ConsoleAppointmentsPage } from "@/pages/console/ConsoleAppointmentsPage";
 
 // Clinic staff roles that may enter the console.
 const STAFF_ROLES = ["PHYSICIAN", "NURSE", "RECEPTIONIST", "CLINIC_ADMIN", "SUPER_ADMIN"] as const;
@@ -47,6 +49,7 @@ export function App() {
             <Route path="episodes/:id" element={<EpisodeDetail />} />
             <Route path="care-plans" element={<CarePlansPage />} />
             <Route path="care-plans/:id" element={<CarePlanDetail />} />
+            <Route path="appointments" element={<AppointmentsPage />} />
             {/* Feature pages — stubs land first via the shell-contract scaffold, then each
                 workstream replaces its page body on its own branch. */}
             <Route path="prescriptions" element={<PrescriptionsPage />} />
@@ -69,6 +72,7 @@ export function App() {
           >
             <Route index element={<QueuePage />} />
             <Route path="episodes/:id" element={<EpisodeReview />} />
+            <Route path="appointments" element={<ConsoleAppointmentsPage />} />
             <Route path="*" element={<ComingSoon title="This page" description="That section isn't available yet." />} />
           </Route>
 

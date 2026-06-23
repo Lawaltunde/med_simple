@@ -1,9 +1,9 @@
-import { ListChecks } from "lucide-react";
+import { ListChecks, CalendarDays } from "lucide-react";
 import { AppShell, type NavItem } from "@/components/AppShell";
 
 const consoleNav: NavItem[] = [
   { label: "Queue", to: "/console", icon: ListChecks, end: true },
-  // Patients, care plans, prescriptions… added as the clinician tools are built.
+  { label: "Appointments", to: "/console/appointments", icon: CalendarDays },
 ];
 
 export function ConsoleApp() {
