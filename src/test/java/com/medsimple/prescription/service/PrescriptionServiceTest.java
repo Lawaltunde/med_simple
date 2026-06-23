@@ -1,6 +1,7 @@
 package com.medsimple.prescription.service;
 
 import com.medsimple.audit.service.AuditService;
+import com.medsimple.auth.security.AccessGuard;
 import com.medsimple.careplan.entity.CarePlan;
 import com.medsimple.careplan.repository.CarePlanRepository;
 import com.medsimple.clinic.entity.Clinic;
@@ -24,6 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -44,6 +46,7 @@ class PrescriptionServiceTest {
     @Mock PrescriptionDeliveryResolver deliveryResolver;
     @Mock PrescriptionDeliveryDao deliveryDao;
     @Mock AuditService auditService;
+    @Mock AccessGuard accessGuard;
 
     @InjectMocks PrescriptionService prescriptionService;
 
@@ -186,5 +189,27 @@ class PrescriptionServiceTest {
         PrescriptionResponse response = prescriptionService.cancelPrescription(rx.getId(), "127.0.0.1");
 
         assertThat(response.status()).isEqualTo(PrescriptionStatus.CANCELLED);
+    }
+
+    @Test
+    void getPatientPrescriptions_checksOwnershipThenReturns() {
+        UUID pid = patient.getId();
+        when(prescriptionRepository.findByPatientIdOrderByCreatedAtDesc(pid)).thenReturn(List.of(draft()));
+
+        List<PrescriptionResponse> out = prescriptionService.getPatientPrescriptions(pid);
+
+        assertThat(out).hasSize(1);
+        verify(accessGuard).requirePatientSelfOrStaff(pid);
+    }
+
+    @Test
+    void getPatientPrescriptions_deniedForAnotherPatient() {
+        UUID pid = patient.getId();
+        doThrow(new AccessDeniedException("not your prescriptions"))
+                .when(accessGuard).requirePatientSelfOrStaff(pid);
+
+        assertThatThrownBy(() -> prescriptionService.getPatientPrescriptions(pid))
+                .isInstanceOf(AccessDeniedException.class);
+        verify(prescriptionRepository, never()).findByPatientIdOrderByCreatedAtDesc(any());
     }
 }

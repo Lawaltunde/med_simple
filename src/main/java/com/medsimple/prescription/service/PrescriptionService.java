@@ -3,6 +3,7 @@ package com.medsimple.prescription.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.medsimple.audit.service.AuditService;
+import com.medsimple.auth.security.AccessGuard;
 import com.medsimple.careplan.entity.CarePlan;
 import com.medsimple.careplan.exception.CarePlanNotFoundException;
 import com.medsimple.careplan.repository.CarePlanRepository;
@@ -35,6 +36,7 @@ public class PrescriptionService {
     private final MedicationSafetyDao medicationSafetyDao;
     private final PrescriptionDeliveryResolver deliveryResolver;
     private final AuditService auditService;
+    private final AccessGuard accessGuard;
 
     @Transactional
     public PrescriptionResponse createPrescription(CreatePrescriptionRequest request, String ipAddress) {
@@ -73,6 +75,15 @@ public class PrescriptionService {
     @Transactional(readOnly = true)
     public List<PrescriptionResponse> getCarePlanPrescriptions(UUID carePlanId) {
         return prescriptionRepository.findByCarePlanIdOrderByCreatedAtDesc(carePlanId)
+                .stream().map(this::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<PrescriptionResponse> getPatientPrescriptions(UUID patientId) {
+        // Patient-scoped read: a patient may see only their own; staff may see any.
+        // Same IDOR gate as the symptom/care-plan endpoints (enforced in the service layer).
+        accessGuard.requirePatientSelfOrStaff(patientId);
+        return prescriptionRepository.findByPatientIdOrderByCreatedAtDesc(patientId)
                 .stream().map(this::toResponse).toList();
     }
 
