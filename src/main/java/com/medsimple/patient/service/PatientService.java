@@ -195,6 +195,16 @@ public class PatientService {
                 .toList();
     }
 
+    // True if the patient currently grants this consent (their latest event for the type is a
+    // grant, not a revoke). Used to gate secondary uses such as the AI learning / RAG corpus —
+    // nothing of a patient's data is used for model improvement without an active AI_TRAINING grant.
+    @Transactional(readOnly = true)
+    public boolean hasActiveConsent(UUID patientId, ConsentType type) {
+        return consentRepository.findFirstByPatientIdAndConsentTypeOrderByCreatedAtDesc(patientId, type)
+                .map(c -> c.getGrantedAt() != null && c.getRevokedAt() == null)
+                .orElse(false);
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     private User findPatientById(UUID id) {
