@@ -1,6 +1,7 @@
 package com.medsimple.referral.service;
 
 import com.medsimple.audit.service.AuditService;
+import com.medsimple.auth.security.AccessGuard;
 import com.medsimple.careplan.entity.CarePlan;
 import com.medsimple.careplan.exception.CarePlanNotFoundException;
 import com.medsimple.careplan.repository.CarePlanRepository;
@@ -28,6 +29,7 @@ public class ReferralService {
     private final SpecialtySuggestionDao specialtySuggestionDao;
     private final ReferralDeliveryResolver deliveryResolver;
     private final AuditService auditService;
+    private final AccessGuard accessGuard;
 
     @Transactional
     public ReferralResponse createReferral(CreateReferralRequest request, String ipAddress) {
@@ -61,6 +63,15 @@ public class ReferralService {
     @Transactional(readOnly = true)
     public List<ReferralResponse> getCarePlanReferrals(UUID carePlanId) {
         return referralRepository.findByCarePlanIdOrderByCreatedAtDesc(carePlanId)
+                .stream().map(this::toResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ReferralResponse> getPatientReferrals(UUID patientId) {
+        // Patient-scoped read: a patient may see only their own referrals; staff any.
+        // Same IDOR gate as the symptom/prescription/diagnostic patient endpoints.
+        accessGuard.requirePatientSelfOrStaff(patientId);
+        return referralRepository.findByPatientIdOrderByCreatedAtDesc(patientId)
                 .stream().map(this::toResponse).toList();
     }
 
