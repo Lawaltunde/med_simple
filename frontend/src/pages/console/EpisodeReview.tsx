@@ -19,6 +19,7 @@ import { FollowUpThread } from "@/features/careplan/FollowUpThread";
 import { PrescriptionCard } from "@/features/prescription/PrescriptionCard";
 import { DiagnosticCard } from "@/features/diagnostic/DiagnosticCard";
 import { ReferralCard } from "@/features/referral/ReferralCard";
+import { BookAppointmentCard } from "@/features/appointment/BookAppointmentCard";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api";
@@ -94,6 +95,7 @@ export function EpisodeReview() {
           <PrescriptionCard episode={episode} episodeId={id} />
           <DiagnosticCard episode={episode} episodeId={id} />
           <ReferralCard episode={episode} episodeId={id} />
+          <BookAppointmentCard episode={episode} episodeId={id} />
         </div>
       )}
     </div>
