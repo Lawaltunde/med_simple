@@ -4,6 +4,8 @@ import com.medsimple.auth.exception.InvalidCredentialsException;
 import com.medsimple.auth.exception.InvalidTokenException;
 import com.medsimple.auth.exception.TooManyAttemptsException;
 import com.medsimple.careplan.exception.CarePlanNotFoundException;
+import com.medsimple.careplan.exception.CareSuggestionNotFoundException;
+import com.medsimple.careplan.exception.InvalidSuggestionStateException;
 import com.medsimple.clinic.exception.ClinicNotFoundException;
 import com.medsimple.clinic.exception.StaffAlreadyExistsException;
 import com.medsimple.prescription.exception.InvalidPrescriptionStateException;
@@ -39,13 +41,13 @@ public class GlobalExceptionHandler {
 
     record ApiError(int status, String error, String message, Instant timestamp) {}
 
-    @ExceptionHandler({PatientNotFoundException.class, ClinicNotFoundException.class, EpisodeNotFoundException.class, CarePlanNotFoundException.class, PrescriptionNotFoundException.class, ReferralNotFoundException.class, RequisitionNotFoundException.class, ResultNotFoundException.class, NotificationNotFoundException.class, SubmissionNotFoundException.class})
+    @ExceptionHandler({PatientNotFoundException.class, ClinicNotFoundException.class, EpisodeNotFoundException.class, CarePlanNotFoundException.class, PrescriptionNotFoundException.class, ReferralNotFoundException.class, RequisitionNotFoundException.class, ResultNotFoundException.class, NotificationNotFoundException.class, SubmissionNotFoundException.class, CareSuggestionNotFoundException.class})
     public ResponseEntity<ApiError> handleNotFound(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ApiError(404, "NOT_FOUND", ex.getMessage(), Instant.now()));
     }
 
-    @ExceptionHandler({InvalidPrescriptionStateException.class, InvalidReferralStateException.class, InvalidRequisitionStateException.class})
+    @ExceptionHandler({InvalidPrescriptionStateException.class, InvalidReferralStateException.class, InvalidRequisitionStateException.class, InvalidSuggestionStateException.class})
     public ResponseEntity<ApiError> handleInvalidState(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ApiError(409, "INVALID_STATE", ex.getMessage(), Instant.now()));

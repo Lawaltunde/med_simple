@@ -40,11 +40,15 @@ vi.mock("@/features/clinician/hooks", () => ({
   useAssignToMe: () => ({ mutate: assignMutate, isPending: false, error: null }),
 }));
 
-// Care-plan card is out of scope here; stub its hooks (no plan yet -> create form).
+// Care-plan card is out of scope here; stub its hooks (no plan yet -> authoring form,
+// no AI suggestion -> blank create form).
 vi.mock("@/features/careplan/hooks", () => ({
   usePatientCarePlans: () => ({ data: [], isLoading: false }),
   useCreateCarePlan: () => ({ mutate: vi.fn(), isPending: false }),
   useUpdateCarePlan: () => ({ mutate: vi.fn(), isPending: false }),
+  useEpisodeSuggestion: () => ({ data: undefined }),
+  useApproveSuggestion: () => ({ mutate: vi.fn(), isPending: false }),
+  useRejectSuggestion: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 // The prescription/diagnostic/referral cards have their own test suites and pull in

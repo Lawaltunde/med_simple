@@ -1,8 +1,13 @@
 package com.medsimple.ai.service;
 
 import com.medsimple.ai.dao.AiTriageDao;
+import com.medsimple.ai.dto.SuggestedCare;
 import com.medsimple.ai.dto.TriageResult;
 import com.medsimple.audit.service.AuditService;
+import com.medsimple.careplan.entity.CareSuggestion;
+import com.medsimple.careplan.entity.CareSuggestionStatus;
+import com.medsimple.careplan.repository.CareSuggestionRepository;
+import com.medsimple.careplan.service.SuggestionGuardrail;
 import com.medsimple.shared.entity.User;
 import com.medsimple.shared.entity.UserRole;
 import com.medsimple.symptom.dto.EpisodeResponse;
@@ -13,6 +18,7 @@ import com.medsimple.symptom.repository.SymptomSubmissionRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -35,6 +41,8 @@ class AiTriageServiceTest {
     @Mock AuditService auditService;
     @Mock com.medsimple.notification.service.NotificationService notificationService;
     @Mock com.medsimple.auth.security.AccessGuard accessGuard;
+    @Mock CareSuggestionRepository careSuggestionRepository;
+    @Mock SuggestionGuardrail suggestionGuardrail;
 
     @InjectMocks AiTriageService aiTriageService;
 
@@ -59,6 +67,13 @@ class AiTriageServiceTest {
                 .createdAt(OffsetDateTime.now())
                 .updatedAt(OffsetDateTime.now())
                 .build();
+
+        // Most non-emergency triages persist a care suggestion; give save an id for the audit log.
+        lenient().when(careSuggestionRepository.save(any())).thenAnswer(inv -> {
+            CareSuggestion c = inv.getArgument(0);
+            if (c.getId() == null) c.setId(UUID.randomUUID());
+            return c;
+        });
     }
 
     private SymptomSubmission textSubmission(String text) {
@@ -178,5 +193,74 @@ class AiTriageServiceTest {
 
         verify(aiTriageDao).analyze(argThat(ctx ->
                 ctx.symptoms().get(0).equals("Patient says chest hurts badly")));
+    }
+
+    // ── AI care suggestion (gate tests) ────────────────────────────────────────
+
+    private void stubTriage(TriageResult result) {
+        when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
+        when(submissionRepository.findByEpisodeIdOrderBySubmittedAtAsc(episodeId))
+                .thenReturn(List.of(textSubmission("symptom text")));
+        when(aiTriageDao.analyze(any())).thenReturn(result);
+        when(episodeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+    }
+
+    private CareSuggestion captureSavedSuggestion() {
+        ArgumentCaptor<CareSuggestion> captor = ArgumentCaptor.forClass(CareSuggestion.class);
+        verify(careSuggestionRepository).save(captor.capture());
+        return captor.getValue();
+    }
+
+    @Test
+    void suggestion_cleanPlan_persistedAsProposedWithText() {
+        stubTriage(new TriageResult(UrgencyLevel.SEE_SOON, "Viral pharyngitis.",
+                new SuggestedCare("Supportive care: rest, fluids, analgesia. Safety-net advice.", "Likely viral")));
+        when(suggestionGuardrail.isBlocked(anyString())).thenReturn(false);
+
+        aiTriageService.triageEpisode(episodeId);
+
+        CareSuggestion saved = captureSavedSuggestion();
+        assertThat(saved.getStatus()).isEqualTo(CareSuggestionStatus.PROPOSED);
+        assertThat(saved.getSuggestedPlan()).contains("Supportive care");
+        verify(auditService).log(eq(patient.getId()), eq("CARE_SUGGESTION_GENERATED"), eq("care_suggestions"), any(), any());
+    }
+
+    @Test
+    void suggestion_guardrailBlocked_persistedFailed_withNoPlanText() {
+        stubTriage(new TriageResult(UrgencyLevel.SEE_SOON, "Pain.",
+                new SuggestedCare("Prescribe oxycodone 10mg every 6 hours.", "pain")));
+        when(suggestionGuardrail.isBlocked(anyString())).thenReturn(true);
+
+        aiTriageService.triageEpisode(episodeId);
+
+        CareSuggestion saved = captureSavedSuggestion();
+        assertThat(saved.getStatus()).isEqualTo(CareSuggestionStatus.FAILED);
+        assertThat(saved.getRejectReason()).isEqualTo(SuggestionGuardrail.BLOCK_REASON);
+        // The blocked plan text must never be stored.
+        assertThat(saved.getSuggestedPlan()).isNull();
+    }
+
+    @Test
+    void suggestion_emergency_notPersistedAtAll() {
+        stubTriage(new TriageResult(UrgencyLevel.EMERGENCY, "Call 911.",
+                new SuggestedCare("should be suppressed", "x")));
+
+        aiTriageService.triageEpisode(episodeId);
+
+        verify(careSuggestionRepository, never()).save(any());
+    }
+
+    @Test
+    void suggestion_noPlanFromAdapter_persistedFailedNoPlan() {
+        // Fallback adapter / AI failure: urgency + summary only, no plan ever fabricated.
+        stubTriage(new TriageResult(UrgencyLevel.ROUTINE, "Routine."));
+
+        aiTriageService.triageEpisode(episodeId);
+
+        CareSuggestion saved = captureSavedSuggestion();
+        assertThat(saved.getStatus()).isEqualTo(CareSuggestionStatus.FAILED);
+        assertThat(saved.getRejectReason()).isEqualTo("NO_PLAN");
+        assertThat(saved.getSuggestedPlan()).isNull();
+        verifyNoInteractions(suggestionGuardrail);
     }
 }

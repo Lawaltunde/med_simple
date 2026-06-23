@@ -4,9 +4,13 @@ import com.medsimple.audit.service.AuditService;
 import com.medsimple.careplan.dto.*;
 import com.medsimple.careplan.entity.CarePlan;
 import com.medsimple.careplan.entity.CarePlanStatus;
+import com.medsimple.careplan.entity.CareSuggestion;
+import com.medsimple.careplan.entity.CareSuggestionStatus;
 import com.medsimple.careplan.entity.FollowUp;
 import com.medsimple.careplan.exception.CarePlanNotFoundException;
+import com.medsimple.careplan.exception.InvalidSuggestionStateException;
 import com.medsimple.careplan.repository.CarePlanRepository;
+import com.medsimple.careplan.repository.CareSuggestionRepository;
 import com.medsimple.careplan.repository.FollowUpRepository;
 import com.medsimple.clinic.entity.Clinic;
 import com.medsimple.patient.repository.PatientRepository;
@@ -20,6 +24,7 @@ import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -37,6 +42,7 @@ import static org.mockito.Mockito.*;
 class CarePlanServiceTest {
 
     @Mock CarePlanRepository carePlanRepository;
+    @Mock CareSuggestionRepository careSuggestionRepository;
     @Mock FollowUpRepository followUpRepository;
     @Mock SymptomEpisodeRepository episodeRepository;
     @Mock PatientRepository userRepository;
@@ -251,5 +257,93 @@ class CarePlanServiceTest {
         assertThatThrownBy(() -> carePlanService.respondToFollowUp(carePlanId, followUpId,
                 new RespondFollowUpRequest(UUID.randomUUID(), "response"), null))
                 .isInstanceOf(CarePlanNotFoundException.class);
+    }
+
+    // ── AI suggestion review workflow ─────────────────────────────────────────
+
+    private CareSuggestion proposedSuggestion(String plan) {
+        return CareSuggestion.builder()
+                .id(UUID.randomUUID()).episode(episode).patient(patient)
+                .adapter("openai").model("gpt-4o").status(CareSuggestionStatus.PROPOSED)
+                .suggestedPlan(plan).rationale("because").createdAt(OffsetDateTime.now()).build();
+    }
+
+    @Test
+    void approveSuggestion_createsActivePlanLinkedToSuggestion() {
+        CareSuggestion s = proposedSuggestion("Supportive care, fluids, rest.");
+        when(careSuggestionRepository.findById(s.getId())).thenReturn(Optional.of(s));
+        when(userRepository.findByIdAndRole(physicianId, UserRole.PHYSICIAN)).thenReturn(Optional.of(physician));
+        when(carePlanRepository.save(any())).thenAnswer(inv -> {
+            CarePlan c = inv.getArgument(0); c.setId(UUID.randomUUID()); return c;
+        });
+
+        CarePlanResponse resp = carePlanService.createFromSuggestion(
+                s.getId(), new ApproveSuggestionRequest(physicianId, null), "127.0.0.1");
+
+        assertThat(resp.status()).isEqualTo(CarePlanStatus.ACTIVE);
+        assertThat(resp.notes()).isEqualTo("Supportive care, fluids, rest.");
+        assertThat(s.getStatus()).isEqualTo(CareSuggestionStatus.APPROVED);
+        assertThat(s.getCarePlanId()).isNotNull();
+        assertThat(episode.getStatus()).isEqualTo(EpisodeStatus.IN_PROGRESS);
+
+        ArgumentCaptor<CarePlan> captor = ArgumentCaptor.forClass(CarePlan.class);
+        verify(carePlanRepository).save(captor.capture());
+        assertThat(captor.getValue().getSourceSuggestionId()).isEqualTo(s.getId());
+        verify(accessGuard).requireStaff();
+        verify(auditService).log(eq(physicianId), eq("CARE_SUGGESTION_APPROVED"), eq("care_suggestions"), any(), any());
+    }
+
+    @Test
+    void editSuggestion_marksEdited_andUsesEditedText() {
+        CareSuggestion s = proposedSuggestion("AI original plan.");
+        when(careSuggestionRepository.findById(s.getId())).thenReturn(Optional.of(s));
+        when(userRepository.findByIdAndRole(physicianId, UserRole.PHYSICIAN)).thenReturn(Optional.of(physician));
+        when(carePlanRepository.save(any())).thenAnswer(inv -> {
+            CarePlan c = inv.getArgument(0); c.setId(UUID.randomUUID()); return c;
+        });
+
+        CarePlanResponse resp = carePlanService.createFromSuggestion(
+                s.getId(), new ApproveSuggestionRequest(physicianId, "Physician revised plan."), "127.0.0.1");
+
+        assertThat(resp.notes()).isEqualTo("Physician revised plan.");
+        assertThat(s.getStatus()).isEqualTo(CareSuggestionStatus.EDITED);
+        verify(auditService).log(eq(physicianId), eq("CARE_SUGGESTION_EDITED"), eq("care_suggestions"), any(), any());
+    }
+
+    @Test
+    void approveSuggestion_notProposed_throws() {
+        CareSuggestion s = proposedSuggestion("plan");
+        s.setStatus(CareSuggestionStatus.APPROVED);
+        when(careSuggestionRepository.findById(s.getId())).thenReturn(Optional.of(s));
+
+        assertThatThrownBy(() -> carePlanService.createFromSuggestion(
+                s.getId(), new ApproveSuggestionRequest(physicianId, null), null))
+                .isInstanceOf(InvalidSuggestionStateException.class);
+        verify(carePlanRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectSuggestion_marksRejected_createsNoPlan() {
+        CareSuggestion s = proposedSuggestion("plan");
+        when(careSuggestionRepository.findById(s.getId())).thenReturn(Optional.of(s));
+        when(userRepository.findByIdAndRole(physicianId, UserRole.PHYSICIAN)).thenReturn(Optional.of(physician));
+
+        carePlanService.rejectSuggestion(s.getId(),
+                new RejectSuggestionRequest(physicianId, "Disagree with assessment"), "127.0.0.1");
+
+        assertThat(s.getStatus()).isEqualTo(CareSuggestionStatus.REJECTED);
+        assertThat(s.getRejectReason()).isEqualTo("Disagree with assessment");
+        verify(carePlanRepository, never()).save(any());
+        verify(auditService).log(eq(physicianId), eq("CARE_SUGGESTION_REJECTED"), eq("care_suggestions"), any(), any());
+    }
+
+    @Test
+    void getSuggestionForEpisode_requiresStaff() {
+        doThrow(new org.springframework.security.access.AccessDeniedException("staff only"))
+                .when(accessGuard).requireStaff();
+
+        assertThatThrownBy(() -> carePlanService.getSuggestionForEpisode(episodeId))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(careSuggestionRepository);
     }
 }
