@@ -48,6 +48,11 @@ public class CarePlan {
 
     private String notes;
 
+    // Set when this plan was created from an AI suggestion (provenance: "AI-assisted,
+    // physician-reviewed"). Null for plans written from scratch.
+    @Column(name = "source_suggestion_id")
+    private UUID sourceSuggestionId;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

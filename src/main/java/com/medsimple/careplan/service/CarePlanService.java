@@ -5,9 +5,14 @@ import com.medsimple.auth.security.AccessGuard;
 import com.medsimple.careplan.dto.*;
 import com.medsimple.careplan.entity.CarePlan;
 import com.medsimple.careplan.entity.CarePlanStatus;
+import com.medsimple.careplan.entity.CareSuggestion;
+import com.medsimple.careplan.entity.CareSuggestionStatus;
 import com.medsimple.careplan.entity.FollowUp;
 import com.medsimple.careplan.exception.CarePlanNotFoundException;
+import com.medsimple.careplan.exception.CareSuggestionNotFoundException;
+import com.medsimple.careplan.exception.InvalidSuggestionStateException;
 import com.medsimple.careplan.repository.CarePlanRepository;
+import com.medsimple.careplan.repository.CareSuggestionRepository;
 import com.medsimple.careplan.repository.FollowUpRepository;
 import com.medsimple.notification.entity.NotificationType;
 import com.medsimple.notification.service.NotificationService;
@@ -26,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -33,6 +39,7 @@ import java.util.UUID;
 public class CarePlanService {
 
     private final CarePlanRepository carePlanRepository;
+    private final CareSuggestionRepository careSuggestionRepository;
     private final FollowUpRepository followUpRepository;
     private final SymptomEpisodeRepository episodeRepository;
     private final PatientRepository userRepository;
@@ -73,6 +80,100 @@ public class CarePlanService {
                 "Your care plan is ready",
                 "A physician has reviewed your symptoms and created a care plan. Tap to read it.");
         return toResponse(saved, List.of());
+    }
+
+    // ── AI care suggestion: physician review workflow ──────────────────────────
+
+    // Staff-only. The latest PROPOSED suggestion a physician would review for this episode.
+    // There is deliberately no patient-facing equivalent — the gate is structural.
+    @Transactional(readOnly = true)
+    public Optional<CareSuggestionResponse> getSuggestionForEpisode(UUID episodeId) {
+        accessGuard.requireStaff();
+        return careSuggestionRepository
+                .findFirstByEpisodeIdAndStatusOrderByCreatedAtDesc(episodeId, CareSuggestionStatus.PROPOSED)
+                .map(this::toSuggestionResponse);
+    }
+
+    // Approve (or edit-then-approve) a suggestion into a signed, ACTIVE care plan. This is the
+    // ONLY path that turns an AI suggestion into patient-visible content, and it is staff-guarded.
+    @Transactional
+    public CarePlanResponse createFromSuggestion(UUID suggestionId, ApproveSuggestionRequest request,
+                                                 String ipAddress) {
+        accessGuard.requireStaff();
+        CareSuggestion suggestion = careSuggestionRepository.findById(suggestionId)
+                .orElseThrow(() -> new CareSuggestionNotFoundException(suggestionId));
+        if (suggestion.getStatus() != CareSuggestionStatus.PROPOSED) {
+            throw new InvalidSuggestionStateException(
+                    "Suggestion " + suggestionId + " is " + suggestion.getStatus() + ", not PROPOSED");
+        }
+        User physician = userRepository.findByIdAndRole(request.physicianId(), UserRole.PHYSICIAN)
+                .orElseThrow(() -> new PatientNotFoundException(request.physicianId()));
+
+        SymptomEpisode episode = suggestion.getEpisode();
+        if (episode.getAssignedClinic() == null) {
+            throw new IllegalStateException(
+                    "Episode " + episode.getId() + " has no assigned clinic; cannot create a care plan");
+        }
+
+        boolean hasEdit = request.editedNotes() != null && !request.editedNotes().isBlank();
+        boolean edited = hasEdit && !request.editedNotes().equals(suggestion.getSuggestedPlan());
+        String notes = hasEdit ? request.editedNotes() : suggestion.getSuggestedPlan();
+
+        CarePlan carePlan = CarePlan.builder()
+                .episode(episode)
+                .patient(episode.getPatient())
+                .physician(physician)
+                .clinic(episode.getAssignedClinic())
+                .notes(notes)
+                .sourceSuggestionId(suggestion.getId())
+                .build();
+        CarePlan saved = carePlanRepository.save(carePlan);
+
+        episode.setStatus(EpisodeStatus.IN_PROGRESS);
+        episodeRepository.save(episode);
+
+        suggestion.setStatus(edited ? CareSuggestionStatus.EDITED : CareSuggestionStatus.APPROVED);
+        suggestion.setReviewedBy(physician);
+        suggestion.setReviewedAt(OffsetDateTime.now());
+        suggestion.setCarePlanId(saved.getId());
+        careSuggestionRepository.save(suggestion);
+
+        auditService.log(request.physicianId(),
+                edited ? "CARE_SUGGESTION_EDITED" : "CARE_SUGGESTION_APPROVED",
+                "care_suggestions", suggestion.getId(), ipAddress);
+        auditService.log(request.physicianId(), "CARE_PLAN_CREATED", "care_plans", saved.getId(), ipAddress);
+        notificationService.notify(episode.getPatient().getId(), NotificationType.CARE_PLAN_UPDATE,
+                "Your care plan is ready",
+                "A physician has reviewed your symptoms and created a care plan. Tap to read it.");
+        return toResponse(saved, List.of());
+    }
+
+    // Reject a suggestion: no care plan is created; the physician writes from scratch instead.
+    @Transactional
+    public void rejectSuggestion(UUID suggestionId, RejectSuggestionRequest request, String ipAddress) {
+        accessGuard.requireStaff();
+        CareSuggestion suggestion = careSuggestionRepository.findById(suggestionId)
+                .orElseThrow(() -> new CareSuggestionNotFoundException(suggestionId));
+        if (suggestion.getStatus() != CareSuggestionStatus.PROPOSED) {
+            throw new InvalidSuggestionStateException(
+                    "Suggestion " + suggestionId + " is " + suggestion.getStatus() + ", not PROPOSED");
+        }
+        userRepository.findByIdAndRole(request.physicianId(), UserRole.PHYSICIAN)
+                .orElseThrow(() -> new PatientNotFoundException(request.physicianId()));
+
+        suggestion.setStatus(CareSuggestionStatus.REJECTED);
+        suggestion.setRejectReason(request.reason());
+        suggestion.setReviewedBy(entityManager.getReference(User.class, request.physicianId()));
+        suggestion.setReviewedAt(OffsetDateTime.now());
+        careSuggestionRepository.save(suggestion);
+        auditService.log(request.physicianId(), "CARE_SUGGESTION_REJECTED",
+                "care_suggestions", suggestion.getId(), ipAddress);
+    }
+
+    private CareSuggestionResponse toSuggestionResponse(CareSuggestion s) {
+        return new CareSuggestionResponse(
+                s.getId(), s.getEpisode().getId(), s.getStatus(),
+                s.getSuggestedPlan(), s.getRationale(), s.getAdapter(), s.getModel(), s.getCreatedAt());
     }
 
     @Transactional(readOnly = true)

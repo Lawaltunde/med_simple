@@ -1,12 +1,19 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams, useLocation } from "react-router-dom";
-import { ArrowLeft, Loader2, Sparkles, UserCheck, CheckCircle2, AlertCircle, ClipboardList } from "lucide-react";
+import { ArrowLeft, Loader2, Sparkles, UserCheck, CheckCircle2, AlertCircle, ClipboardList, Bot, X } from "lucide-react";
 import { useAuth } from "@/auth/AuthProvider";
 import { useEpisode } from "@/features/symptom/hooks";
 import { effectiveUrgency, type Episode, type UrgencyLevel } from "@/features/symptom/types";
 import { UrgencyBadge, urgencyMeta, statusLabel, formatDateTime } from "@/features/symptom/display";
 import { useAssignToMe, useConfirmUrgency } from "@/features/clinician/hooks";
-import { usePatientCarePlans, useCreateCarePlan, useUpdateCarePlan } from "@/features/careplan/hooks";
+import {
+  usePatientCarePlans,
+  useCreateCarePlan,
+  useUpdateCarePlan,
+  useEpisodeSuggestion,
+  useApproveSuggestion,
+  useRejectSuggestion,
+} from "@/features/careplan/hooks";
 import { CarePlanStatusBadge } from "@/features/careplan/display";
 import { FollowUpThread } from "@/features/careplan/FollowUpThread";
 import { PrescriptionCard } from "@/features/prescription/PrescriptionCard";
@@ -96,9 +103,7 @@ export function EpisodeReview() {
 function CarePlanCard({ episode, episodeId }: { episode: Episode; episodeId: string }) {
   const { user } = useAuth();
   const { data: plans, isLoading } = usePatientCarePlans(episode.patientId);
-  const create = useCreateCarePlan();
   const update = useUpdateCarePlan();
-  const [notes, setNotes] = useState("");
 
   const plan = plans?.find((p) => p.episodeId === episodeId);
 
@@ -110,34 +115,10 @@ function CarePlanCard({ episode, episodeId }: { episode: Episode; episodeId: str
     );
   }
 
-  // No plan yet — author one. Creating it moves the episode to IN_PROGRESS.
+  // No plan yet — author one (from the AI suggestion if there is one). Creating it moves
+  // the episode to IN_PROGRESS.
   if (!plan) {
-    const tooShort = notes.trim().length < 5;
-    return (
-      <section className="rounded-2xl border border-line bg-white p-6">
-        <h3 className="flex items-center gap-2 font-bold text-brand-900">
-          <ClipboardList className="size-4 text-brand-600" /> Create care plan
-        </h3>
-        <p className="mt-1 text-sm text-muted">Write the plan and instructions. The patient is notified and can reply.</p>
-        <Textarea
-          name="notes"
-          className="mt-4"
-          rows={4}
-          placeholder="e.g. Likely viral pharyngitis. Rest, fluids, acetaminophen as needed. Return if fever > 39°C or symptoms persist past 5 days."
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          disabled={create.isPending}
-        />
-        <Button
-          className="mt-4"
-          disabled={create.isPending || tooShort || !user}
-          onClick={() => user && create.mutate({ episodeId, physicianId: user.id, notes: notes.trim() })}
-        >
-          {create.isPending ? <Loader2 className="size-4 animate-spin" /> : <ClipboardList className="size-4" />}
-          Create care plan
-        </Button>
-      </section>
-    );
+    return <PlanAuthoring episode={episode} episodeId={episodeId} />;
   }
 
   // Plan exists — show it, allow completion (resolves the episode), and message the patient.
@@ -164,6 +145,91 @@ function CarePlanCard({ episode, episodeId }: { episode: Episode; episodeId: str
 
       <div className="border-t border-line pt-5">
         {user && <FollowUpThread plan={plan} currentUserId={user.id} />}
+      </div>
+    </section>
+  );
+}
+
+// Authoring a new plan: if the AI proposed one, the physician edits/approves/rejects it;
+// otherwise they write from scratch. Approving (or edit-then-approving) is the only path
+// that turns an AI suggestion into a patient-visible plan.
+function PlanAuthoring({ episode, episodeId }: { episode: Episode; episodeId: string }) {
+  const { user } = useAuth();
+  const { data: suggestion } = useEpisodeSuggestion(episodeId);
+  const create = useCreateCarePlan();
+  const approve = useApproveSuggestion(episodeId, episode.patientId);
+  const reject = useRejectSuggestion(episodeId);
+  const [notes, setNotes] = useState("");
+  const [rejected, setRejected] = useState(false);
+
+  const aiPlan = suggestion?.status === "PROPOSED" ? suggestion.suggestedPlan ?? null : null;
+  const showAi = !!aiPlan && !rejected;
+
+  // Pre-fill the editor with the AI draft once it loads (physician edits in place).
+  useEffect(() => {
+    if (aiPlan && !rejected) setNotes(aiPlan);
+  }, [aiPlan, rejected]);
+
+  const tooShort = notes.trim().length < 5;
+  const pending = create.isPending || approve.isPending || reject.isPending;
+
+  function submit() {
+    if (!user || tooShort) return;
+    if (showAi && suggestion) {
+      const edited = notes.trim() !== (suggestion.suggestedPlan ?? "").trim();
+      approve.mutate({ id: suggestion.id, physicianId: user.id, editedNotes: edited ? notes.trim() : undefined });
+    } else {
+      create.mutate({ episodeId, physicianId: user.id, notes: notes.trim() });
+    }
+  }
+
+  return (
+    <section className="rounded-2xl border border-line bg-white p-6">
+      <h3 className="flex items-center gap-2 font-bold text-brand-900">
+        {showAi ? <Bot className="size-4 text-brand-600" /> : <ClipboardList className="size-4 text-brand-600" />}
+        {showAi ? "AI suggested care plan" : "Create care plan"}
+      </h3>
+
+      {showAi ? (
+        <div className="mt-3 rounded-xl border border-brand-200 bg-brand-50/60 p-3 text-xs text-brand-800">
+          AI-generated suggestion. Advisory only — you are the responsible clinician. Review, edit, or
+          reject before it reaches the patient.
+          {suggestion?.rationale && <p className="mt-1 font-medium text-brand-700">Why: {suggestion.rationale}</p>}
+        </div>
+      ) : (
+        <p className="mt-1 text-sm text-muted">Write the plan and instructions. The patient is notified and can reply.</p>
+      )}
+
+      <Textarea
+        name="notes"
+        className="mt-4"
+        rows={5}
+        placeholder="e.g. Likely viral pharyngitis. Rest, fluids, acetaminophen as needed. Return if fever > 39°C or symptoms persist past 5 days."
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        disabled={pending}
+      />
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button disabled={pending || tooShort || !user} onClick={submit}>
+          {pending ? <Loader2 className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+          {showAi ? "Approve & send to patient" : "Create care plan"}
+        </Button>
+        {showAi && suggestion && (
+          <Button
+            variant="ghost"
+            disabled={pending || !user}
+            onClick={() =>
+              user &&
+              reject.mutate(
+                { id: suggestion.id, physicianId: user.id },
+                { onSuccess: () => { setRejected(true); setNotes(""); } }
+              )
+            }
+          >
+            <X className="size-4" /> Reject, write my own
+          </Button>
+        )}
       </div>
     </section>
   );
