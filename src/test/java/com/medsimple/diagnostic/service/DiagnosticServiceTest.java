@@ -1,6 +1,7 @@
 package com.medsimple.diagnostic.service;
 
 import com.medsimple.audit.service.AuditService;
+import com.medsimple.auth.security.AccessGuard;
 import com.medsimple.careplan.entity.CarePlan;
 import com.medsimple.careplan.repository.CarePlanRepository;
 import com.medsimple.clinic.entity.Clinic;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -40,6 +42,7 @@ class DiagnosticServiceTest {
     @Mock ResultSummaryDao resultSummaryDao;
     @Mock AuditService auditService;
     @Mock com.medsimple.notification.service.NotificationService notificationService;
+    @Mock AccessGuard accessGuard;
 
     @InjectMocks DiagnosticService diagnosticService;
 
@@ -173,6 +176,19 @@ class DiagnosticServiceTest {
         // The query itself enforces the gate — verify we called the gated finder, not the full one.
         verify(resultRepository).findByPatientIdAndReleasedToPatientAtIsNotNullOrderByReceivedAtDesc(patient.getId());
         verify(resultRepository, never()).findByPatientIdOrderByReceivedAtDesc(any());
+        verify(accessGuard).requirePatientSelfOrStaff(patient.getId());
+    }
+
+    @Test
+    void patientList_deniedForAnotherPatient() {
+        UUID pid = patient.getId();
+        doThrow(new AccessDeniedException("not your results"))
+                .when(accessGuard).requirePatientSelfOrStaff(pid);
+
+        assertThatThrownBy(() -> diagnosticService.getPatientReleasedResults(pid))
+                .isInstanceOf(AccessDeniedException.class);
+        verify(resultRepository, never())
+                .findByPatientIdAndReleasedToPatientAtIsNotNullOrderByReceivedAtDesc(any());
     }
 
     @Test
