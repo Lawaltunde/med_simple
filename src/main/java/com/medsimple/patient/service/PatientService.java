@@ -34,6 +34,7 @@ public class PatientService {
     private final AuditService auditService;
     private final EntityManager entityManager;
     private final com.medsimple.auth.security.AccessGuard accessGuard;
+    private final com.medsimple.patient.validation.HealthCardValidator healthCardValidator;
 
     @Transactional
     public PatientResponse createPatient(CreatePatientRequest request, String ipAddress) {
@@ -99,6 +100,9 @@ public class PatientService {
     public HealthCoverageResponse addHealthCoverage(UUID patientId, AddHealthCoverageRequest request,
                                                      String ipAddress) {
         User patient = findPatientById(patientId);
+
+        // Reject a malformed/invalid card before it is ever encrypted or stored.
+        healthCardValidator.validate(request.coverageType(), request.province(), request.cardNumber());
 
         PatientHealthCoverage coverage = PatientHealthCoverage.builder()
                 .patient(patient)
