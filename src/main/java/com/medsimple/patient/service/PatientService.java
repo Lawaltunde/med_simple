@@ -35,6 +35,7 @@ public class PatientService {
     private final EntityManager entityManager;
     private final com.medsimple.auth.security.AccessGuard accessGuard;
     private final com.medsimple.patient.validation.HealthCardValidator healthCardValidator;
+    private final com.medsimple.patient.eligibility.HealthCardEligibilityDao eligibilityDao;
 
     @Transactional
     public PatientResponse createPatient(CreatePatientRequest request, String ipAddress) {
@@ -104,6 +105,11 @@ public class PatientService {
         // Reject a malformed/invalid card before it is ever encrypted or stored.
         healthCardValidator.validate(request.coverageType(), request.province(), request.cardNumber());
 
+        // Check live coverage with the Ministry of Health (MOH HCV adapter when provisioned;
+        // format-only fallback otherwise). UNKNOWN never blocks onboarding — it is recorded.
+        var eligibility = eligibilityDao.check(
+                request.coverageType(), request.province(), request.cardNumber());
+
         PatientHealthCoverage coverage = PatientHealthCoverage.builder()
                 .patient(patient)
                 .coverageType(request.coverageType())
@@ -115,7 +121,10 @@ public class PatientService {
                 .build();
 
         PatientHealthCoverage saved = coverageRepository.save(coverage);
-        auditService.log(patientId, "COVERAGE_ADDED", "patient_health_coverage", saved.getId(), ipAddress);
+        // Record the eligibility outcome (source + status) on the audit event — no card number.
+        auditService.log(patientId, "COVERAGE_ADDED", "patient_health_coverage", saved.getId(), ipAddress,
+                java.util.Map.of("eligibilityStatus", eligibility.status().name(),
+                        "eligibilitySource", eligibility.source()));
 
         return toCoverageResponse(saved);
     }
