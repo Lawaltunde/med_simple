@@ -8,7 +8,7 @@ import java.util.UUID;
 
 // refills is nullable so an omitted field is valid (defaults to 0 in the service).
 public record CreatePrescriptionRequest(
-        @NotNull UUID carePlanId,
+        @NotNull UUID episodeId,
         @NotBlank String medicationName,
         String medicationCode,
         @NotBlank String dosage,

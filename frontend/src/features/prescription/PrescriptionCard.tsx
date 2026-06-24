@@ -3,11 +3,10 @@ import { Pill, Loader2, AlertTriangle, CheckCircle2, Send, PenLine, XCircle } fr
 import { useAuth } from "@/auth/AuthProvider";
 import type { Episode } from "@/features/symptom/types";
 import { formatDateTime } from "@/features/symptom/display";
-import { usePatientCarePlans } from "@/features/careplan/hooks";
 import { Button } from "@/components/ui/button";
 import { ApiError } from "@/lib/api";
 import {
-  useCarePlanPrescriptions,
+  useEpisodePrescriptions,
   useCreatePrescription,
   useSignPrescription,
   useSendPrescription,
@@ -224,10 +223,10 @@ const EMPTY: FormState = {
 };
 
 function NewPrescriptionForm({
-  carePlanId,
+  episodeId,
   onCreated,
 }: {
-  carePlanId: string;
+  episodeId: string;
   onCreated: () => void;
 }) {
   const [form, setForm] = useState<FormState>(EMPTY);
@@ -247,7 +246,7 @@ function NewPrescriptionForm({
     setErrorMsg(null);
     try {
       await create.mutateAsync({
-        carePlanId,
+        episodeId,
         medicationName: form.medicationName.trim(),
         medicationCode: form.medicationCode.trim() || undefined,
         dosage: form.dosage.trim(),
@@ -374,17 +373,13 @@ function NewPrescriptionForm({
 
 // ── Main card ────────────────────────────────────────────────────────────────
 
-export function PrescriptionCard({ episode, episodeId }: { episode: Episode; episodeId: string }) {
+export function PrescriptionCard({ episodeId }: { episode: Episode; episodeId: string }) {
   const { user } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // The prescriptions endpoint is care-plan-scoped. Resolve the care plan for this
-  // episode the same way CarePlanCard does — look it up from the patient's plan list.
-  const { data: plans } = usePatientCarePlans(episode.patientId);
-  const carePlanId = plans?.find((p) => p.episodeId === episodeId)?.id ?? null;
-
-  const { data: prescriptions, isLoading } = useCarePlanPrescriptions(carePlanId ?? undefined);
+  // Prescriptions hang off the episode now, so a physician can prescribe without a care plan.
+  const { data: prescriptions, isLoading } = useEpisodePrescriptions(episodeId);
   const sign = useSignPrescription();
   const send = useSendPrescription();
   const cancel = useCancelPrescription();
@@ -418,9 +413,6 @@ export function PrescriptionCard({ episode, episodeId }: { episode: Episode; epi
     }
   }
 
-  // No care plan yet — don't render the card (plan must exist first).
-  if (!carePlanId) return null;
-
   return (
     <section className="rounded-2xl border border-line bg-white p-6">
       <div className="flex items-center justify-between">
@@ -434,9 +426,9 @@ export function PrescriptionCard({ episode, episodeId }: { episode: Episode; epi
         )}
       </div>
 
-      {showForm && carePlanId && (
+      {showForm && (
         <NewPrescriptionForm
-          carePlanId={carePlanId}
+          episodeId={episodeId}
           onCreated={() => setShowForm(false)}
         />
       )}
@@ -454,7 +446,7 @@ export function PrescriptionCard({ episode, episodeId }: { episode: Episode; epi
       )}
 
       {!isLoading && prescriptions && prescriptions.length === 0 && !showForm && (
-        <p className="mt-4 text-sm text-muted">No prescriptions yet for this care plan.</p>
+        <p className="mt-4 text-sm text-muted">No prescriptions yet for this episode.</p>
       )}
 
       {!isLoading && prescriptions && prescriptions.length > 0 && (
