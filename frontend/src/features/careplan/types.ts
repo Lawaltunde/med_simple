@@ -36,6 +36,7 @@ export interface CareSuggestion {
   status: CareSuggestionStatus;
   suggestedPlan: string | null;
   rationale: string | null;
+  suggestedFollowUpDays: number | null;
   adapter: string;
   model: string | null;
   createdAt: string;

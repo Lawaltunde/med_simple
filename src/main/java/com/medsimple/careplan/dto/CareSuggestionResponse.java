@@ -12,6 +12,7 @@ public record CareSuggestionResponse(
         CareSuggestionStatus status,
         String suggestedPlan,
         String rationale,
+        Integer suggestedFollowUpDays,
         String adapter,
         String model,
         OffsetDateTime createdAt

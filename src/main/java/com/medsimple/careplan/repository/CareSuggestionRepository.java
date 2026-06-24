@@ -17,6 +17,9 @@ public interface CareSuggestionRepository extends JpaRepository<CareSuggestion, 
     Optional<CareSuggestion> findFirstByEpisodeIdAndStatusOrderByCreatedAtDesc(
             UUID episodeId, CareSuggestionStatus status);
 
+    Optional<CareSuggestion> findFirstByEpisodeIdAndStatusInOrderByCreatedAtDesc(
+            UUID episodeId, java.util.Collection<CareSuggestionStatus> statuses);
+
     // RAG corpus: physician-approved plans (the signed care_plans.notes) paired with the
     // episode's AI summary used as the matching signal, newest first. Native because
     // care_plan_id is an unmapped FK column. Consent is filtered downstream (per patient).

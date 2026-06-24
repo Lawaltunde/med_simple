@@ -268,6 +268,28 @@ class AiTriageServiceTest {
     }
 
     @Test
+    void suggestion_persistsFollowUpDays() {
+        stubTriage(new TriageResult(UrgencyLevel.SEE_SOON, "Viral URI.",
+                new SuggestedCare("Supportive care.", "viral", 3)));
+        when(suggestionGuardrail.isBlocked(anyString())).thenReturn(false);
+
+        aiTriageService.triageEpisode(episodeId);
+
+        assertThat(captureSavedSuggestion().getSuggestedFollowUpDays()).isEqualTo(3);
+    }
+
+    @Test
+    void suggestion_dropsOutOfRangeFollowUp() {
+        stubTriage(new TriageResult(UrgencyLevel.SEE_SOON, "Viral URI.",
+                new SuggestedCare("Supportive care.", "viral", 999)));
+        when(suggestionGuardrail.isBlocked(anyString())).thenReturn(false);
+
+        aiTriageService.triageEpisode(episodeId);
+
+        assertThat(captureSavedSuggestion().getSuggestedFollowUpDays()).isNull();
+    }
+
+    @Test
     void triage_passesRetrievedExemplarsIntoModelContext() {
         when(planRetriever.retrieveExemplars(anyString(), anyInt()))
                 .thenReturn(List.of("Approved plan: supportive care and safety-net advice."));
