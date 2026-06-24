@@ -41,6 +41,8 @@ public class OpenAiTriageAdapter implements AiTriageDao {
                  > 39C, difficulty swallowing, or symptoms persist past 5 days. Consider in-person
                  exam if no improvement.").
                - rationale: one sentence on why.
+               - followUpDays: if a follow-up visit is clinically appropriate, the suggested
+                 interval in days (1-90), e.g. 3. Use null if no routine follow-up is needed.
 
             HARD RULES for suggestedCare (a physician edits or approves before any patient sees it):
             - It is a PLAN OF CARE, not a prescription. Never name a specific drug dose
