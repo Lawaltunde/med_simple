@@ -38,6 +38,11 @@ public class DiagnosticController {
         return ResponseEntity.ok(diagnosticService.getCarePlanRequisitions(carePlanId));
     }
 
+    @GetMapping("/api/v1/episodes/{episodeId}/requisitions")
+    public ResponseEntity<List<RequisitionResponse>> getForEpisode(@PathVariable UUID episodeId) {
+        return ResponseEntity.ok(diagnosticService.getEpisodeRequisitions(episodeId));
+    }
+
     @PostMapping("/api/v1/requisitions/{id}/send")
     public ResponseEntity<RequisitionResponse> sendRequisition(@PathVariable UUID id, HttpServletRequest httpRequest) {
         return ResponseEntity.ok(diagnosticService.sendRequisition(id, httpRequest.getRemoteAddr()));

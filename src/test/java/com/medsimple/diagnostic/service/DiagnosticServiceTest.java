@@ -12,6 +12,9 @@ import com.medsimple.diagnostic.exception.InvalidRequisitionStateException;
 import com.medsimple.diagnostic.exception.ResultNotReleasedException;
 import com.medsimple.diagnostic.repository.DiagnosticRequisitionRepository;
 import com.medsimple.diagnostic.repository.DiagnosticResultRepository;
+import com.medsimple.symptom.entity.EpisodeStatus;
+import com.medsimple.symptom.entity.SymptomEpisode;
+import com.medsimple.symptom.repository.SymptomEpisodeRepository;
 import com.medsimple.shared.entity.User;
 import com.medsimple.shared.entity.UserRole;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,6 +40,7 @@ class DiagnosticServiceTest {
     @Mock DiagnosticRequisitionRepository requisitionRepository;
     @Mock DiagnosticResultRepository resultRepository;
     @Mock CarePlanRepository carePlanRepository;
+    @Mock SymptomEpisodeRepository episodeRepository;
     @Mock RequisitionDeliveryResolver deliveryResolver;
     @Mock RequisitionDeliveryDao deliveryDao;
     @Mock ResultSummaryDao resultSummaryDao;
@@ -50,6 +54,7 @@ class DiagnosticServiceTest {
     private User physician;
     private Clinic clinic;
     private CarePlan carePlan;
+    private SymptomEpisode episode;
     private DiagnosticRequisition requisition;
     private UUID carePlanId;
     private UUID requisitionId;
@@ -65,8 +70,11 @@ class DiagnosticServiceTest {
         clinic = Clinic.builder().id(UUID.randomUUID()).name("Clinic").build();
         carePlan = CarePlan.builder().id(carePlanId).patient(patient).physician(physician)
                 .clinic(clinic).createdAt(OffsetDateTime.now()).updatedAt(OffsetDateTime.now()).build();
+        episode = SymptomEpisode.builder().id(UUID.randomUUID()).patient(patient)
+                .assignedClinic(clinic).assignedPhysician(physician).status(EpisodeStatus.IN_PROGRESS)
+                .createdAt(OffsetDateTime.now()).updatedAt(OffsetDateTime.now()).build();
         requisition = DiagnosticRequisition.builder()
-                .id(requisitionId).carePlan(carePlan).patient(patient).orderingPhysician(physician)
+                .id(requisitionId).episode(episode).carePlan(carePlan).patient(patient).orderingPhysician(physician)
                 .testType("CBC").status(RequisitionStatus.DRAFT).urgency(RequisitionUrgency.ROUTINE)
                 .createdAt(OffsetDateTime.now()).updatedAt(OffsetDateTime.now()).build();
     }
@@ -83,6 +91,33 @@ class DiagnosticServiceTest {
     }
 
     // ── requisition lifecycle ───────────────────────────────────────────────────
+
+    @Test
+    void createRequisition_fromEpisode_derivesPatientAndPhysician_noCarePlanNeeded() {
+        UUID eid = episode.getId();
+        when(episodeRepository.findById(eid)).thenReturn(Optional.of(episode));
+        when(requisitionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        RequisitionResponse resp = diagnosticService.createRequisition(
+                new CreateRequisitionRequest(eid, "CBC", null, "anemia workup", RequisitionUrgency.ROUTINE),
+                "127.0.0.1");
+
+        assertThat(resp.episodeId()).isEqualTo(eid);
+        assertThat(resp.patientId()).isEqualTo(patient.getId());
+        assertThat(resp.orderingPhysicianId()).isEqualTo(physician.getId());
+        assertThat(resp.carePlanId()).isNull(); // ordered without a care plan
+    }
+
+    @Test
+    void createRequisition_episodeNotAssignedToPhysician_throws() {
+        episode.setAssignedPhysician(null);
+        when(episodeRepository.findById(episode.getId())).thenReturn(Optional.of(episode));
+
+        assertThatThrownBy(() -> diagnosticService.createRequisition(
+                new CreateRequisitionRequest(episode.getId(), "CBC", null, null, RequisitionUrgency.ROUTINE), null))
+                .isInstanceOf(IllegalStateException.class);
+        verify(requisitionRepository, never()).save(any());
+    }
 
     @Test
     void send_draftDispatchesAndBecomesSent() {

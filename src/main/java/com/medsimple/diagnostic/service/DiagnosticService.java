@@ -11,6 +11,9 @@ import com.medsimple.diagnostic.entity.*;
 import com.medsimple.diagnostic.exception.*;
 import com.medsimple.diagnostic.repository.DiagnosticRequisitionRepository;
 import com.medsimple.diagnostic.repository.DiagnosticResultRepository;
+import com.medsimple.symptom.entity.SymptomEpisode;
+import com.medsimple.symptom.exception.EpisodeNotFoundException;
+import com.medsimple.symptom.repository.SymptomEpisodeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +29,7 @@ public class DiagnosticService {
     private final DiagnosticRequisitionRepository requisitionRepository;
     private final DiagnosticResultRepository resultRepository;
     private final CarePlanRepository carePlanRepository;
+    private final SymptomEpisodeRepository episodeRepository;
     private final RequisitionDeliveryResolver deliveryResolver;
     private final ResultSummaryDao resultSummaryDao;
     private final AuditService auditService;
@@ -36,13 +40,19 @@ public class DiagnosticService {
 
     @Transactional
     public RequisitionResponse createRequisition(CreateRequisitionRequest request, String ipAddress) {
-        CarePlan carePlan = carePlanRepository.findById(request.carePlanId())
-                .orElseThrow(() -> new CarePlanNotFoundException(request.carePlanId()));
+        // Orders hang off the episode (the encounter), not the care plan — a physician can order a
+        // work-up before writing a plan. They must have taken the episode first (assigned to them).
+        SymptomEpisode episode = episodeRepository.findById(request.episodeId())
+                .orElseThrow(() -> new EpisodeNotFoundException(request.episodeId()));
+        if (episode.getAssignedClinic() == null || episode.getAssignedPhysician() == null) {
+            throw new IllegalStateException(
+                    "Episode " + request.episodeId() + " must be assigned to a physician before ordering");
+        }
 
         DiagnosticRequisition requisition = DiagnosticRequisition.builder()
-                .carePlan(carePlan)
-                .patient(carePlan.getPatient())
-                .orderingPhysician(carePlan.getPhysician())
+                .episode(episode)
+                .patient(episode.getPatient())
+                .orderingPhysician(episode.getAssignedPhysician())
                 .testType(request.testType())
                 .testCodes(request.testCodes() != null ? request.testCodes() : List.of())
                 .clinicalIndication(request.clinicalIndication())
@@ -51,7 +61,7 @@ public class DiagnosticService {
                 .build();
 
         DiagnosticRequisition saved = requisitionRepository.save(requisition);
-        auditService.log(carePlan.getPhysician().getId(), "REQUISITION_CREATED",
+        auditService.log(episode.getAssignedPhysician().getId(), "REQUISITION_CREATED",
                 "diagnostic_requisitions", saved.getId(), ipAddress);
         return toRequisitionResponse(saved);
     }
@@ -101,6 +111,14 @@ public class DiagnosticService {
     @Transactional(readOnly = true)
     public List<RequisitionResponse> getCarePlanRequisitions(UUID carePlanId) {
         return requisitionRepository.findByCarePlanIdOrderByCreatedAtDesc(carePlanId)
+                .stream().map(this::toRequisitionResponse).toList();
+    }
+
+    // Staff-facing: the requisitions ordered for an episode (the console's diagnostic list).
+    @Transactional(readOnly = true)
+    public List<RequisitionResponse> getEpisodeRequisitions(UUID episodeId) {
+        accessGuard.requireStaff();
+        return requisitionRepository.findByEpisodeIdOrderByCreatedAtDesc(episodeId)
                 .stream().map(this::toRequisitionResponse).toList();
     }
 
@@ -220,7 +238,8 @@ public class DiagnosticService {
 
     private RequisitionResponse toRequisitionResponse(DiagnosticRequisition r) {
         return new RequisitionResponse(
-                r.getId(), r.getCarePlan().getId(), r.getPatient().getId(),
+                r.getId(), r.getEpisode().getId(),
+                r.getCarePlan() != null ? r.getCarePlan().getId() : null, r.getPatient().getId(),
                 r.getOrderingPhysician().getId(), r.getTestType(), r.getTestCodes(),
                 r.getClinicalIndication(), r.getUrgency(), r.getStatus(),
                 r.getDeliveryMethod(), r.getDiagnosticCentreId(), r.getDocumentUrl(),

@@ -54,15 +54,15 @@ class DiagnosticControllerTest {
 
     @Test
     void createRequisition_returns201() throws Exception {
-        RequisitionResponse resp = new RequisitionResponse(id, carePlanId, UUID.randomUUID(), UUID.randomUUID(),
-                "CBC", List.of("58410-2"), "anemia workup", RequisitionUrgency.ROUTINE,
+        RequisitionResponse resp = new RequisitionResponse(id, UUID.randomUUID(), carePlanId, UUID.randomUUID(),
+                UUID.randomUUID(), "CBC", List.of("58410-2"), "anemia workup", RequisitionUrgency.ROUTINE,
                 RequisitionStatus.DRAFT, null, null, null, null, null, null, OffsetDateTime.now());
         when(diagnosticService.createRequisition(any(), any())).thenReturn(resp);
 
         mockMvc.perform(post("/api/v1/requisitions")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CreateRequisitionRequest(
-                                carePlanId, "CBC", List.of("58410-2"), "anemia workup", RequisitionUrgency.ROUTINE))))
+                                UUID.randomUUID(), "CBC", List.of("58410-2"), "anemia workup", RequisitionUrgency.ROUTINE))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.testType").value("CBC"))
                 .andExpect(jsonPath("$.status").value("DRAFT"));
