@@ -77,7 +77,19 @@ public class ObjectStoreMediaStorageAdapter implements MediaStorageDao {
         GetObjectResponse meta = obj.response();
         String owner = meta.metadata().get(OWNER_META);
         UUID ownerId = (owner != null && !owner.isBlank()) ? UUID.fromString(owner) : null;
-        return new MediaContent(new ByteArrayResource(obj.asByteArray()), meta.contentType(), ownerId);
+
+        // The resource MUST carry a filename with the right extension: downstream Whisper/vision
+        // calls upload it as a multipart file, and OpenAI infers the format from the filename. A
+        // bare ByteArrayResource has no filename, so Whisper rejects it ("Unrecognized file
+        // format"). The local-disk adapter gets this for free via the on-disk {id}.{ext} path.
+        String filename = id + "." + MediaContentType.extensionFor(meta.contentType());
+        ByteArrayResource resource = new ByteArrayResource(obj.asByteArray()) {
+            @Override
+            public String getFilename() {
+                return filename;
+            }
+        };
+        return new MediaContent(resource, meta.contentType(), ownerId);
     }
 
     @Override
