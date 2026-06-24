@@ -86,11 +86,14 @@ public class CarePlanService {
 
     // Staff-only. The latest PROPOSED suggestion a physician would review for this episode.
     // There is deliberately no patient-facing equivalent — the gate is structural.
+    // Returns the latest in-play suggestion (PROPOSED, or already APPROVED/EDITED) so the console
+    // still sees the AI's follow-up interval after the plan is approved. FAILED/REJECTED excluded.
     @Transactional(readOnly = true)
     public Optional<CareSuggestionResponse> getSuggestionForEpisode(UUID episodeId) {
         accessGuard.requireStaff();
         return careSuggestionRepository
-                .findFirstByEpisodeIdAndStatusOrderByCreatedAtDesc(episodeId, CareSuggestionStatus.PROPOSED)
+                .findFirstByEpisodeIdAndStatusInOrderByCreatedAtDesc(episodeId, List.of(
+                        CareSuggestionStatus.PROPOSED, CareSuggestionStatus.APPROVED, CareSuggestionStatus.EDITED))
                 .map(this::toSuggestionResponse);
     }
 
@@ -173,7 +176,8 @@ public class CarePlanService {
     private CareSuggestionResponse toSuggestionResponse(CareSuggestion s) {
         return new CareSuggestionResponse(
                 s.getId(), s.getEpisode().getId(), s.getStatus(),
-                s.getSuggestedPlan(), s.getRationale(), s.getAdapter(), s.getModel(), s.getCreatedAt());
+                s.getSuggestedPlan(), s.getRationale(), s.getSuggestedFollowUpDays(),
+                s.getAdapter(), s.getModel(), s.getCreatedAt());
     }
 
     @Transactional(readOnly = true)

@@ -39,6 +39,11 @@ public class CareSuggestion {
 
     private String rationale;
 
+    // The AI's suggested follow-up interval in days (nullable). The physician approves it into
+    // an appointment.
+    @Column(name = "suggested_followup_days")
+    private Integer suggestedFollowUpDays;
+
     @Column(nullable = false)
     private String adapter;   // 'openai' | 'fallback'
 
