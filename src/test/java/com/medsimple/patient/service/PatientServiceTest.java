@@ -42,6 +42,7 @@ class PatientServiceTest {
     @Mock AuditService auditService;
     @Mock EntityManager entityManager;
     @Mock com.medsimple.auth.security.AccessGuard accessGuard;
+    @Mock com.medsimple.patient.validation.HealthCardValidator healthCardValidator;
 
     @InjectMocks PatientService patientService;
 

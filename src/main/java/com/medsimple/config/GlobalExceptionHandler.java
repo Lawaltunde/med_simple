@@ -24,6 +24,7 @@ import com.medsimple.referral.exception.InvalidReferralStateException;
 import com.medsimple.referral.exception.ReferralNotFoundException;
 import com.medsimple.symptom.exception.EpisodeNotFoundException;
 import com.medsimple.patient.exception.EmailAlreadyInUseException;
+import com.medsimple.patient.exception.InvalidHealthCardException;
 import com.medsimple.patient.exception.PatientAlreadyRegisteredException;
 import com.medsimple.patient.exception.PatientNotFoundException;
 import lombok.extern.slf4j.Slf4j;
@@ -103,6 +104,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleConflict(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ApiError(409, "CONFLICT", ex.getMessage(), Instant.now()));
+    }
+
+    @ExceptionHandler(InvalidHealthCardException.class)
+    public ResponseEntity<ApiError> handleInvalidHealthCard(InvalidHealthCardException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ApiError(400, "INVALID_HEALTH_CARD", ex.getMessage(), Instant.now()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
