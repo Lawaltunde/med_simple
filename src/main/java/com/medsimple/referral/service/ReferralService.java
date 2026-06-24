@@ -120,7 +120,11 @@ public class ReferralService {
         }
 
         // clinic_capabilities decides the channel: Ocean eReferral if enabled, else PDF.
-        UUID clinicId = referral.getCarePlan().getClinic().getId();
+        // Orders hang off the episode (care plan optional since the re-parent), so the clinic comes
+        // from the episode's assigned clinic, falling back to the care plan for legacy rows.
+        UUID clinicId = referral.getEpisode() != null && referral.getEpisode().getAssignedClinic() != null
+                ? referral.getEpisode().getAssignedClinic().getId()
+                : referral.getCarePlan().getClinic().getId();
         ReferralDeliveryDao delivery = deliveryResolver.resolve(clinicId);
         ReferralDeliveryResult result = delivery.deliver(referral);
 
