@@ -13,7 +13,7 @@ vi.mock("@/auth/AuthProvider", () => ({
 const listPatientMock = vi.fn();
 vi.mock("@/features/prescription/api", () => ({
   listPatientPrescriptions: (...a: unknown[]) => listPatientMock(...a),
-  listCarePlanPrescriptions: vi.fn().mockResolvedValue([]),
+  listEpisodePrescriptions: vi.fn().mockResolvedValue([]),
   createPrescription: vi.fn(),
   getPrescription: vi.fn(),
   signPrescription: vi.fn(),
@@ -24,7 +24,8 @@ vi.mock("@/features/prescription/api", () => ({
 function rx(over: Partial<Prescription>): Prescription {
   return {
     id: "rx-1",
-    carePlanId: "cp-1",
+    episodeId: "ep-1",
+    carePlanId: null,
     patientId: "patient-1",
     prescribingPhysicianId: "doc-1",
     medicationName: "Amoxicillin",

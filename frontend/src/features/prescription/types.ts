@@ -12,7 +12,8 @@ export type DeliveryMethod = "PRESCRIBIT" | "PDF_FAX" | "PDF_PRINT";
 
 export interface Prescription {
   id: string;
-  carePlanId: string;
+  episodeId: string;
+  carePlanId: string | null;
   patientId: string;
   prescribingPhysicianId: string;
   medicationName: string;
@@ -36,7 +37,7 @@ export interface Prescription {
 
 // Mirrors CreatePrescriptionRequest
 export interface CreatePrescriptionInput {
-  carePlanId: string;
+  episodeId: string;
   medicationName: string;
   medicationCode?: string;
   dosage: string;

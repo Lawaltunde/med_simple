@@ -4,7 +4,7 @@ import {
   cancelPrescription,
   createPrescription,
   getPrescription,
-  listCarePlanPrescriptions,
+  listEpisodePrescriptions,
   listPatientPrescriptions,
   sendPrescription,
   signPrescription,
@@ -20,7 +20,7 @@ describe("prescription api", () => {
 
   it("createPrescription POSTs to /prescriptions with full body", async () => {
     await createPrescription({
-      carePlanId: "cp-1",
+      episodeId: "ep-1",
       medicationName: "Amoxicillin",
       dosage: "500 mg",
       frequency: "Three times daily",
@@ -29,7 +29,7 @@ describe("prescription api", () => {
     expect(mockApi.mock.calls[0][0]).toBe("/prescriptions");
     expect(methodOf(0)).toBe("POST");
     expect(bodyOf(0)).toMatchObject({
-      carePlanId: "cp-1",
+      episodeId: "ep-1",
       medicationName: "Amoxicillin",
       dosage: "500 mg",
       frequency: "Three times daily",
@@ -42,9 +42,9 @@ describe("prescription api", () => {
     expect(mockApi.mock.calls[0][0]).toBe("/prescriptions/rx-99");
   });
 
-  it("listCarePlanPrescriptions GETs the care-plan-scoped path", async () => {
-    await listCarePlanPrescriptions("cp-2");
-    expect(mockApi.mock.calls[0][0]).toBe("/care-plans/cp-2/prescriptions");
+  it("listEpisodePrescriptions GETs the episode-scoped path", async () => {
+    await listEpisodePrescriptions("ep-2");
+    expect(mockApi.mock.calls[0][0]).toBe("/episodes/ep-2/prescriptions");
   });
 
   it("listPatientPrescriptions GETs the patient-scoped path", async () => {

@@ -53,7 +53,7 @@ class PrescriptionControllerTest {
     }
 
     private PrescriptionResponse response(PrescriptionStatus status, DeliveryMethod method, String docUrl) {
-        return new PrescriptionResponse(rxId, carePlanId, UUID.randomUUID(), UUID.randomUUID(),
+        return new PrescriptionResponse(rxId, UUID.randomUUID(), carePlanId, UUID.randomUUID(), UUID.randomUUID(),
                 "Amoxicillin", null, "500mg", "TID", "7 days", 0, "Take with food",
                 "{\"interactions\":[],\"allergyFlags\":[],\"doseWarnings\":[]}",
                 status, method, null, docUrl, null, null, null, OffsetDateTime.now());
@@ -67,7 +67,7 @@ class PrescriptionControllerTest {
         mockMvc.perform(post("/api/v1/prescriptions")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CreatePrescriptionRequest(
-                                carePlanId, "Amoxicillin", null, "500mg", "TID", "7 days", 0, "Take with food"))))
+                                UUID.randomUUID(), "Amoxicillin", null, "500mg", "TID", "7 days", 0, "Take with food"))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("DRAFT"))
                 .andExpect(jsonPath("$.medicationName").value("Amoxicillin"));
@@ -77,7 +77,7 @@ class PrescriptionControllerTest {
     void create_missingMedicationName_returns400() throws Exception {
         mockMvc.perform(post("/api/v1/prescriptions")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"carePlanId\":\"" + carePlanId + "\",\"dosage\":\"500mg\",\"frequency\":\"TID\"}"))
+                        .content("{\"episodeId\":\"" + carePlanId + "\",\"dosage\":\"500mg\",\"frequency\":\"TID\"}"))
                 .andExpect(status().isBadRequest());
     }
 

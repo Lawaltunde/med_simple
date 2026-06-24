@@ -16,6 +16,10 @@ import com.medsimple.prescription.entity.PrescriptionStatus;
 import com.medsimple.prescription.exception.InvalidPrescriptionStateException;
 import com.medsimple.prescription.exception.PrescriptionNotFoundException;
 import com.medsimple.prescription.repository.PrescriptionRepository;
+import com.medsimple.shared.entity.User;
+import com.medsimple.symptom.entity.SymptomEpisode;
+import com.medsimple.symptom.exception.EpisodeNotFoundException;
+import com.medsimple.symptom.repository.SymptomEpisodeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +36,7 @@ public class PrescriptionService {
 
     private final PrescriptionRepository prescriptionRepository;
     private final CarePlanRepository carePlanRepository;
+    private final SymptomEpisodeRepository episodeRepository;
     private final PatientProfileRepository patientProfileRepository;
     private final MedicationSafetyDao medicationSafetyDao;
     private final PrescriptionDeliveryResolver deliveryResolver;
@@ -40,16 +45,22 @@ public class PrescriptionService {
 
     @Transactional
     public PrescriptionResponse createPrescription(CreatePrescriptionRequest request, String ipAddress) {
-        CarePlan carePlan = carePlanRepository.findById(request.carePlanId())
-                .orElseThrow(() -> new CarePlanNotFoundException(request.carePlanId()));
+        // Prescriptions hang off the episode, not the care plan. The physician must have taken
+        // the episode (assigned to them) first.
+        SymptomEpisode episode = episodeRepository.findById(request.episodeId())
+                .orElseThrow(() -> new EpisodeNotFoundException(request.episodeId()));
+        if (episode.getAssignedClinic() == null || episode.getAssignedPhysician() == null) {
+            throw new IllegalStateException(
+                    "Episode " + request.episodeId() + " must be assigned to a physician before prescribing");
+        }
 
         // PHI-stripped safety check against the patient's allergies and current medications.
-        SafetyCheckResult safety = medicationSafetyDao.check(buildContext(request, carePlan));
+        SafetyCheckResult safety = medicationSafetyDao.check(buildContext(request, episode.getPatient()));
 
         Prescription prescription = Prescription.builder()
-                .carePlan(carePlan)
-                .patient(carePlan.getPatient())
-                .prescribingPhysician(carePlan.getPhysician())
+                .episode(episode)
+                .patient(episode.getPatient())
+                .prescribingPhysician(episode.getAssignedPhysician())
                 .medicationName(request.medicationName())
                 .medicationCode(request.medicationCode())
                 .dosage(request.dosage())
@@ -62,7 +73,7 @@ public class PrescriptionService {
                 .build();
 
         Prescription saved = prescriptionRepository.save(prescription);
-        auditService.log(carePlan.getPhysician().getId(), "PRESCRIPTION_CREATED",
+        auditService.log(episode.getAssignedPhysician().getId(), "PRESCRIPTION_CREATED",
                 "prescriptions", saved.getId(), ipAddress);
         return toResponse(saved);
     }
@@ -75,6 +86,14 @@ public class PrescriptionService {
     @Transactional(readOnly = true)
     public List<PrescriptionResponse> getCarePlanPrescriptions(UUID carePlanId) {
         return prescriptionRepository.findByCarePlanIdOrderByCreatedAtDesc(carePlanId)
+                .stream().map(this::toResponse).toList();
+    }
+
+    // Staff-facing: the prescriptions written for an episode (the console's prescription list).
+    @Transactional(readOnly = true)
+    public List<PrescriptionResponse> getEpisodePrescriptions(UUID episodeId) {
+        accessGuard.requireStaff();
+        return prescriptionRepository.findByEpisodeIdOrderByCreatedAtDesc(episodeId)
                 .stream().map(this::toResponse).toList();
     }
 
@@ -160,8 +179,8 @@ public class PrescriptionService {
                 .orElseThrow(() -> new PrescriptionNotFoundException(id));
     }
 
-    private MedicationContext buildContext(CreatePrescriptionRequest request, CarePlan carePlan) {
-        PatientProfile profile = patientProfileRepository.findByUserId(carePlan.getPatient().getId())
+    private MedicationContext buildContext(CreatePrescriptionRequest request, User patient) {
+        PatientProfile profile = patientProfileRepository.findByUserId(patient.getId())
                 .orElse(null);
         List<String> allergies = profile == null ? List.of()
                 : profile.getAllergies().stream().map(a -> a.name()).toList();
@@ -183,7 +202,8 @@ public class PrescriptionService {
     private PrescriptionResponse toResponse(Prescription p) {
         return new PrescriptionResponse(
                 p.getId(),
-                p.getCarePlan().getId(),
+                p.getEpisode().getId(),
+                p.getCarePlan() != null ? p.getCarePlan().getId() : null,
                 p.getPatient().getId(),
                 p.getPrescribingPhysician().getId(),
                 p.getMedicationName(),

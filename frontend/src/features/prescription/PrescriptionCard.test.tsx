@@ -25,9 +25,9 @@ vi.mock("@/features/careplan/api", () => ({
 }));
 
 // Stub the prescription API.
-const listCarePlanPrescriptionsMock = vi.fn();
+const listEpisodePrescriptionsMock = vi.fn();
 vi.mock("@/features/prescription/api", () => ({
-  listCarePlanPrescriptions: (...a: unknown[]) => listCarePlanPrescriptionsMock(...a),
+  listEpisodePrescriptions: (...a: unknown[]) => listEpisodePrescriptionsMock(...a),
   listPatientPrescriptions: vi.fn().mockResolvedValue([]),
   createPrescription: vi.fn(),
   getPrescription: vi.fn(),
@@ -67,7 +67,8 @@ const CARE_PLAN: CarePlan = {
 function rx(over: Partial<Prescription>): Prescription {
   return {
     id: "rx-1",
-    carePlanId: "cp-1",
+    episodeId: "ep-1",
+    carePlanId: null,
     patientId: "patient-1",
     prescribingPhysicianId: "doc-1",
     medicationName: "Amoxicillin",
@@ -104,35 +105,25 @@ function renderCard() {
 describe("PrescriptionCard", () => {
   beforeEach(() => {
     listPatientCarePlansMock.mockReset();
-    listCarePlanPrescriptionsMock.mockReset();
+    listEpisodePrescriptionsMock.mockReset();
   });
 
-  it("renders nothing when no care plan exists for the episode", async () => {
-    listPatientCarePlansMock.mockResolvedValue([]);
-    listCarePlanPrescriptionsMock.mockResolvedValue([]);
-    const { container } = renderCard();
-    // Wait for query resolution — the card should be absent (returns null).
-    await new Promise((r) => setTimeout(r, 50));
-    expect(container.firstChild).toBeNull();
-  });
-
-  it("renders the prescriptions section heading when a care plan exists", async () => {
-    listPatientCarePlansMock.mockResolvedValue([CARE_PLAN]);
-    listCarePlanPrescriptionsMock.mockResolvedValue([]);
+  it("renders the prescriptions section without needing a care plan", async () => {
+    listEpisodePrescriptionsMock.mockResolvedValue([]);
     renderCard();
     expect(await screen.findByRole("heading", { name: /prescriptions/i })).toBeInTheDocument();
   });
 
   it("shows empty state message when there are no prescriptions", async () => {
     listPatientCarePlansMock.mockResolvedValue([CARE_PLAN]);
-    listCarePlanPrescriptionsMock.mockResolvedValue([]);
+    listEpisodePrescriptionsMock.mockResolvedValue([]);
     renderCard();
     expect(await screen.findByText(/no prescriptions yet/i)).toBeInTheDocument();
   });
 
   it("renders an existing prescription with name and DRAFT badge", async () => {
     listPatientCarePlansMock.mockResolvedValue([CARE_PLAN]);
-    listCarePlanPrescriptionsMock.mockResolvedValue([rx({ medicationName: "Lisinopril", status: "DRAFT" })]);
+    listEpisodePrescriptionsMock.mockResolvedValue([rx({ medicationName: "Lisinopril", status: "DRAFT" })]);
     renderCard();
     expect(await screen.findByText("Lisinopril")).toBeInTheDocument();
     expect(await screen.findByText(/draft/i)).toBeInTheDocument();
@@ -140,7 +131,7 @@ describe("PrescriptionCard", () => {
 
   it("shows Sign and Cancel buttons for a DRAFT prescription", async () => {
     listPatientCarePlansMock.mockResolvedValue([CARE_PLAN]);
-    listCarePlanPrescriptionsMock.mockResolvedValue([rx({ status: "DRAFT" })]);
+    listEpisodePrescriptionsMock.mockResolvedValue([rx({ status: "DRAFT" })]);
     renderCard();
     expect(await screen.findByRole("button", { name: /sign/i })).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: /cancel/i })).toBeInTheDocument();
@@ -148,14 +139,14 @@ describe("PrescriptionCard", () => {
 
   it("shows Send and Cancel buttons for a SIGNED prescription", async () => {
     listPatientCarePlansMock.mockResolvedValue([CARE_PLAN]);
-    listCarePlanPrescriptionsMock.mockResolvedValue([rx({ status: "SIGNED" })]);
+    listEpisodePrescriptionsMock.mockResolvedValue([rx({ status: "SIGNED" })]);
     renderCard();
     expect(await screen.findByRole("button", { name: /send/i })).toBeInTheDocument();
   });
 
   it("shows AI safety warning badge when there are allergy flags", async () => {
     listPatientCarePlansMock.mockResolvedValue([CARE_PLAN]);
-    listCarePlanPrescriptionsMock.mockResolvedValue([
+    listEpisodePrescriptionsMock.mockResolvedValue([
       rx({
         aiSafetyChecks: JSON.stringify({
           interactions: [],
@@ -171,7 +162,7 @@ describe("PrescriptionCard", () => {
 
   it("shows clean safety panel when no warnings", async () => {
     listPatientCarePlansMock.mockResolvedValue([CARE_PLAN]);
-    listCarePlanPrescriptionsMock.mockResolvedValue([
+    listEpisodePrescriptionsMock.mockResolvedValue([
       rx({
         aiSafetyChecks: JSON.stringify({
           interactions: [],
