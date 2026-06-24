@@ -6,11 +6,13 @@ import com.medsimple.clinic.entity.*;
 import com.medsimple.clinic.exception.ClinicNotFoundException;
 import com.medsimple.clinic.exception.StaffAlreadyExistsException;
 import com.medsimple.clinic.repository.*;
+import com.medsimple.auth.security.AccessGuard;
 import com.medsimple.patient.exception.EmailAlreadyInUseException;
 import com.medsimple.patient.repository.PatientRepository;
 import com.medsimple.shared.entity.User;
 import com.medsimple.shared.entity.UserRole;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +30,19 @@ public class ClinicService {
     private final PatientRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
+    private final AccessGuard accessGuard;
+
+    /**
+     * A CLINIC_ADMIN may manage only their own clinic; a SUPER_ADMIN may manage any. The
+     * controller's @PreAuthorize already restricts the caller to those two roles — this stops a
+     * clinic admin of one clinic from reaching into another.
+     */
+    private void requireClinicScope(UUID clinicId) {
+        if (!accessGuard.hasRole(UserRole.SUPER_ADMIN)
+                && !staffRepository.existsByClinicIdAndUserId(clinicId, accessGuard.currentUserId())) {
+            throw new AccessDeniedException("You can only manage your own clinic");
+        }
+    }
 
     @Transactional
     public ClinicResponse createClinic(CreateClinicRequest request, String ipAddress) {
@@ -94,6 +109,7 @@ public class ClinicService {
 
     @Transactional
     public StaffResponse addStaff(UUID clinicId, AddStaffRequest request, String ipAddress) {
+        requireClinicScope(clinicId);
         Clinic clinic = findClinicById(clinicId);
 
         if (userRepository.existsByEmail(request.email())) {
@@ -139,6 +155,7 @@ public class ClinicService {
 
     @Transactional
     public void removeStaff(UUID clinicId, UUID staffId) {
+        requireClinicScope(clinicId);
         ClinicStaff staff = staffRepository.findByIdAndClinicId(staffId, clinicId)
                 .orElseThrow(() -> new ClinicNotFoundException(clinicId));
         staff.setActive(false);
@@ -149,6 +166,7 @@ public class ClinicService {
 
     @Transactional
     public CapabilityResponse setCapability(UUID clinicId, SetCapabilityRequest request) {
+        requireClinicScope(clinicId);
         findClinicById(clinicId);
         Clinic clinicRef = clinicRepository.getReferenceById(clinicId);
 

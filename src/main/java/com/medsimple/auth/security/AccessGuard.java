@@ -1,5 +1,6 @@
 package com.medsimple.auth.security;
 
+import com.medsimple.shared.entity.UserRole;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -31,6 +32,14 @@ public class AccessGuard {
         return authentication().getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .anyMatch(PATIENT_AUTHORITY::equals);
+    }
+
+    /** True when the caller holds the given role. */
+    public boolean hasRole(UserRole role) {
+        String authority = "ROLE_" + role.name();
+        return authentication().getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch(authority::equals);
     }
 
     /**
