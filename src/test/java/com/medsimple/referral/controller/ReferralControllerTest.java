@@ -56,7 +56,7 @@ class ReferralControllerTest {
 
     private ReferralResponse response(ReferralStatus status, ReferralDeliveryMethod method,
                                       String externalId, String docUrl) {
-        return new ReferralResponse(refId, carePlanId, UUID.randomUUID(), UUID.randomUUID(),
+        return new ReferralResponse(refId, UUID.randomUUID(), carePlanId, UUID.randomUUID(), UUID.randomUUID(),
                 "Cardiology", null, "chest pain", ReferralUrgency.ROUTINE,
                 status, method, externalId, docUrl, null, OffsetDateTime.now());
     }
@@ -69,7 +69,7 @@ class ReferralControllerTest {
         mockMvc.perform(post("/api/v1/referrals")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new CreateReferralRequest(
-                                carePlanId, "Recurrent chest pain", ReferralUrgency.URGENT))))
+                                UUID.randomUUID(), "Recurrent chest pain", ReferralUrgency.URGENT))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("DRAFT"))
                 .andExpect(jsonPath("$.aiSuggestedSpecialty").value("Cardiology"));
@@ -79,13 +79,13 @@ class ReferralControllerTest {
     void create_missingSummary_returns400() throws Exception {
         mockMvc.perform(post("/api/v1/referrals")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"carePlanId\":\"" + carePlanId + "\",\"urgency\":\"ROUTINE\"}"))
+                        .content("{\"episodeId\":\"" + carePlanId + "\",\"urgency\":\"ROUTINE\"}"))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     void confirmSpecialty_returns200() throws Exception {
-        ReferralResponse resp = new ReferralResponse(refId, carePlanId, UUID.randomUUID(), UUID.randomUUID(),
+        ReferralResponse resp = new ReferralResponse(refId, UUID.randomUUID(), carePlanId, UUID.randomUUID(), UUID.randomUUID(),
                 "Cardiology", "Respirology", "chest pain", ReferralUrgency.ROUTINE,
                 ReferralStatus.DRAFT, null, null, null, null, OffsetDateTime.now());
         when(referralService.confirmSpecialty(eq(refId), any(), any())).thenReturn(resp);

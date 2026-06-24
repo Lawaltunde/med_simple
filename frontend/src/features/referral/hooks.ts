@@ -3,14 +3,14 @@ import {
   cancelReferral,
   confirmSpecialty,
   createReferral,
-  getCarePlanReferrals,
+  getEpisodeReferrals,
   getPatientReferrals,
   submitReferral,
 } from "./api";
 import type { ReferralUrgency } from "./types";
 
 export const referralKeys = {
-  forCarePlan: (carePlanId: string) => ["referrals", "care-plan", carePlanId] as const,
+  forEpisode: (episodeId: string) => ["referrals", "episode", episodeId] as const,
   forPatient: (patientId: string) => ["referrals", "patient", patientId] as const,
   detail: (id: string) => ["referrals", "detail", id] as const,
 };
@@ -18,11 +18,11 @@ export const referralKeys = {
 // Patient polling: 30 s so status changes (SUBMITTED → ACCEPTED → COMPLETED) surface without refresh.
 const PATIENT_POLL_MS = 30_000;
 
-export function useCarePlanReferrals(carePlanId: string | undefined) {
+export function useEpisodeReferrals(episodeId: string | undefined) {
   return useQuery({
-    queryKey: referralKeys.forCarePlan(carePlanId ?? ""),
-    queryFn: () => getCarePlanReferrals(carePlanId!),
-    enabled: !!carePlanId,
+    queryKey: referralKeys.forEpisode(episodeId ?? ""),
+    queryFn: () => getEpisodeReferrals(episodeId!),
+    enabled: !!episodeId,
   });
 }
 
@@ -37,43 +37,43 @@ export function usePatientReferrals(patientId: string | undefined) {
 
 function useReferralInvalidation() {
   const qc = useQueryClient();
-  return (opts: { carePlanId?: string; patientId?: string; referralId?: string }) => {
-    if (opts.carePlanId) qc.invalidateQueries({ queryKey: referralKeys.forCarePlan(opts.carePlanId) });
+  return (opts: { episodeId?: string; patientId?: string; referralId?: string }) => {
+    if (opts.episodeId) qc.invalidateQueries({ queryKey: referralKeys.forEpisode(opts.episodeId) });
     if (opts.patientId) qc.invalidateQueries({ queryKey: referralKeys.forPatient(opts.patientId) });
     if (opts.referralId) qc.invalidateQueries({ queryKey: referralKeys.detail(opts.referralId) });
   };
 }
 
-export function useCreateReferral(carePlanId: string) {
+export function useCreateReferral(episodeId: string) {
   const invalidate = useReferralInvalidation();
   return useMutation({
     mutationFn: (input: { clinicalSummary: string; urgency: ReferralUrgency }) =>
-      createReferral({ carePlanId, ...input }),
-    onSuccess: (r) => invalidate({ carePlanId, patientId: r.patientId }),
+      createReferral({ episodeId, ...input }),
+    onSuccess: (r) => invalidate({ episodeId, patientId: r.patientId }),
   });
 }
 
-export function useConfirmSpecialty(carePlanId: string) {
+export function useConfirmSpecialty(episodeId: string) {
   const invalidate = useReferralInvalidation();
   return useMutation({
     mutationFn: ({ id, confirmedSpecialty }: { id: string; confirmedSpecialty: string }) =>
       confirmSpecialty(id, confirmedSpecialty),
-    onSuccess: (r) => invalidate({ carePlanId, patientId: r.patientId, referralId: r.id }),
+    onSuccess: (r) => invalidate({ episodeId, patientId: r.patientId, referralId: r.id }),
   });
 }
 
-export function useSubmitReferral(carePlanId: string) {
+export function useSubmitReferral(episodeId: string) {
   const invalidate = useReferralInvalidation();
   return useMutation({
     mutationFn: (id: string) => submitReferral(id),
-    onSuccess: (r) => invalidate({ carePlanId, patientId: r.patientId, referralId: r.id }),
+    onSuccess: (r) => invalidate({ episodeId, patientId: r.patientId, referralId: r.id }),
   });
 }
 
-export function useCancelReferral(carePlanId: string) {
+export function useCancelReferral(episodeId: string) {
   const invalidate = useReferralInvalidation();
   return useMutation({
     mutationFn: (id: string) => cancelReferral(id),
-    onSuccess: (r) => invalidate({ carePlanId, patientId: r.patientId, referralId: r.id }),
+    onSuccess: (r) => invalidate({ episodeId, patientId: r.patientId, referralId: r.id }),
   });
 }

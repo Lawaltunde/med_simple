@@ -17,6 +17,9 @@ import com.medsimple.referral.exception.InvalidReferralStateException;
 import com.medsimple.referral.repository.ReferralRepository;
 import com.medsimple.shared.entity.User;
 import com.medsimple.shared.entity.UserRole;
+import com.medsimple.symptom.entity.EpisodeStatus;
+import com.medsimple.symptom.entity.SymptomEpisode;
+import com.medsimple.symptom.repository.SymptomEpisodeRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -39,6 +42,7 @@ class ReferralServiceTest {
 
     @Mock ReferralRepository referralRepository;
     @Mock CarePlanRepository carePlanRepository;
+    @Mock SymptomEpisodeRepository episodeRepository;
     @Mock SpecialtySuggestionDao specialtySuggestionDao;
     @Mock ReferralDeliveryResolver deliveryResolver;
     @Mock ReferralDeliveryDao deliveryDao;
@@ -51,6 +55,7 @@ class ReferralServiceTest {
     private User physician;
     private Clinic clinic;
     private CarePlan carePlan;
+    private SymptomEpisode episode;
     private UUID carePlanId;
 
     @BeforeEach
@@ -63,11 +68,14 @@ class ReferralServiceTest {
         clinic = Clinic.builder().id(UUID.randomUUID()).name("Clinic").build();
         carePlan = CarePlan.builder().id(carePlanId).patient(patient).physician(physician)
                 .clinic(clinic).createdAt(OffsetDateTime.now()).updatedAt(OffsetDateTime.now()).build();
+        episode = SymptomEpisode.builder().id(UUID.randomUUID()).patient(patient)
+                .assignedClinic(clinic).assignedPhysician(physician).status(EpisodeStatus.IN_PROGRESS)
+                .createdAt(OffsetDateTime.now()).updatedAt(OffsetDateTime.now()).build();
     }
 
     private Referral draft(String aiSpecialty, String confirmed) {
         return Referral.builder()
-                .id(UUID.randomUUID()).carePlan(carePlan).patient(patient)
+                .id(UUID.randomUUID()).episode(episode).carePlan(carePlan).patient(patient)
                 .referringPhysician(physician).aiSuggestedSpecialty(aiSpecialty)
                 .confirmedSpecialty(confirmed).clinicalSummary("chest pain")
                 .urgency(ReferralUrgency.ROUTINE).status(ReferralStatus.DRAFT)
@@ -77,21 +85,34 @@ class ReferralServiceTest {
     // ── create + AI suggestion ──────────────────────────────────────────────────
 
     @Test
-    void create_runsSpecialtySuggestion() {
+    void create_fromEpisode_runsSpecialtySuggestion_noCarePlanNeeded() {
         CreateReferralRequest request = new CreateReferralRequest(
-                carePlanId, "Recurrent chest pain on exertion", ReferralUrgency.URGENT);
+                episode.getId(), "Recurrent chest pain on exertion", ReferralUrgency.URGENT);
 
-        when(carePlanRepository.findById(carePlanId)).thenReturn(Optional.of(carePlan));
+        when(episodeRepository.findById(episode.getId())).thenReturn(Optional.of(episode));
         when(specialtySuggestionDao.suggest("Recurrent chest pain on exertion"))
                 .thenReturn(new SpecialtySuggestion("Cardiology", "Cardiac presentation"));
         when(referralRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         ReferralResponse response = referralService.createReferral(request, "127.0.0.1");
 
+        assertThat(response.episodeId()).isEqualTo(episode.getId());
         assertThat(response.aiSuggestedSpecialty()).isEqualTo("Cardiology");
         assertThat(response.status()).isEqualTo(ReferralStatus.DRAFT);
-        assertThat(response.urgency()).isEqualTo(ReferralUrgency.URGENT);
+        assertThat(response.carePlanId()).isNull(); // referred without a care plan
         verify(specialtySuggestionDao).suggest("Recurrent chest pain on exertion");
+    }
+
+    @Test
+    void create_episodeNotAssignedToPhysician_throws() {
+        episode.setAssignedPhysician(null);
+        when(episodeRepository.findById(episode.getId())).thenReturn(Optional.of(episode));
+
+        assertThatThrownBy(() -> referralService.createReferral(
+                new CreateReferralRequest(episode.getId(), "chest pain", ReferralUrgency.ROUTINE), null))
+                .isInstanceOf(IllegalStateException.class);
+        verify(referralRepository, never()).save(any());
+        verifyNoInteractions(specialtySuggestionDao);
     }
 
     // ── confirm specialty (physician override) ──────────────────────────────────

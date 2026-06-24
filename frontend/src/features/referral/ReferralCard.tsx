@@ -3,12 +3,11 @@ import { Loader2, Send, Sparkles, CheckCircle2, AlertCircle, ExternalLink } from
 import { useAuth } from "@/auth/AuthProvider";
 import type { Episode } from "@/features/symptom/types";
 import { formatDateTime } from "@/features/symptom/display";
-import { usePatientCarePlans } from "@/features/careplan/hooks";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api";
 import {
-  useCarePlanReferrals,
+  useEpisodeReferrals,
   useConfirmSpecialty,
   useCreateReferral,
   useSubmitReferral,
@@ -16,29 +15,16 @@ import {
 import { ReferralStatusBadge, ReferralUrgencyBadge, deliveryLabel } from "./display";
 import type { Referral, ReferralUrgency } from "./types";
 
-// Physician-only slot rendered inside EpisodeReview.
-// Requires an active care plan on this episode before a referral can be created.
+// Physician-only slot rendered inside EpisodeReview. Referrals hang off the episode, so a
+// physician can refer without first writing a care plan.
 export function ReferralCard({ episode, episodeId }: { episode: Episode; episodeId: string }) {
   const { user } = useAuth();
-  const { data: plans, isLoading: plansLoading } = usePatientCarePlans(episode.patientId);
-
-  // Only physicians see this card.
   if (user?.role !== "PHYSICIAN") return null;
-
-  // Stay invisible until we know there's a care plan for this episode — the slot
-  // shouldn't flash its own loader (CarePlanCard already shows loading state).
-  if (plansLoading) return null;
-
-  const plan = plans?.find((p) => p.episodeId === episodeId);
-
-  // No care plan yet — referrals require one. Stay silent (CarePlanCard handles prompting the physician).
-  if (!plan) return null;
-
-  return <ReferralCardInner carePlanId={plan.id} />;
+  return <ReferralCardInner episodeId={episodeId || episode.id} />;
 }
 
-function ReferralCardInner({ carePlanId }: { carePlanId: string }) {
-  const { data: referrals, isLoading } = useCarePlanReferrals(carePlanId);
+function ReferralCardInner({ episodeId }: { episodeId: string }) {
+  const { data: referrals, isLoading } = useEpisodeReferrals(episodeId);
 
   if (isLoading) {
     return (
@@ -59,11 +45,11 @@ function ReferralCardInner({ carePlanId }: { carePlanId: string }) {
       {referrals && referrals.length > 0 ? (
         <div className="space-y-4">
           {referrals.map((r) => (
-            <ExistingReferral key={r.id} referral={r} carePlanId={carePlanId} />
+            <ExistingReferral key={r.id} referral={r} episodeId={episodeId} />
           ))}
         </div>
       ) : (
-        <CreateReferralForm carePlanId={carePlanId} />
+        <CreateReferralForm episodeId={episodeId} />
       )}
     </section>
   );
@@ -77,10 +63,10 @@ const URGENCY_OPTIONS: { value: ReferralUrgency; label: string }[] = [
   { value: "EMERGENT", label: "Emergent" },
 ];
 
-function CreateReferralForm({ carePlanId }: { carePlanId: string }) {
+function CreateReferralForm({ episodeId }: { episodeId: string }) {
   const [summary, setSummary] = useState("");
   const [urgency, setUrgency] = useState<ReferralUrgency>("ROUTINE");
-  const create = useCreateReferral(carePlanId);
+  const create = useCreateReferral(episodeId);
 
   const tooShort = summary.trim().length < 10;
   const errorMessage =
@@ -151,9 +137,9 @@ function CreateReferralForm({ carePlanId }: { carePlanId: string }) {
 
 // ── Existing referral ──────────────────────────────────────────────────────────
 
-function ExistingReferral({ referral, carePlanId }: { referral: Referral; carePlanId: string }) {
-  const confirm = useConfirmSpecialty(carePlanId);
-  const submit = useSubmitReferral(carePlanId);
+function ExistingReferral({ referral, episodeId }: { referral: Referral; episodeId: string }) {
+  const confirm = useConfirmSpecialty(episodeId);
+  const submit = useSubmitReferral(episodeId);
 
   const [specialtyInput, setSpecialtyInput] = useState(
     referral.confirmedSpecialty ?? referral.aiSuggestedSpecialty

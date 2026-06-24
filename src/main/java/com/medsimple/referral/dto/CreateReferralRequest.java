@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
 public record CreateReferralRequest(
-        @NotNull UUID carePlanId,
+        @NotNull UUID episodeId,
         @NotBlank String clinicalSummary,
         @NotNull ReferralUrgency urgency
 ) {}
