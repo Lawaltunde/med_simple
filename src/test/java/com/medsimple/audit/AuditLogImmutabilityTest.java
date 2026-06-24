@@ -2,6 +2,9 @@ package com.medsimple.audit;
 
 import com.medsimple.audit.repository.AuditLogRepository;
 import com.medsimple.audit.service.AuditService;
+import com.medsimple.patient.repository.PatientRepository;
+import com.medsimple.shared.entity.User;
+import com.medsimple.shared.entity.UserRole;
 import com.medsimple.support.PostgresIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,13 +33,23 @@ class AuditLogImmutabilityTest extends PostgresIntegrationTest {
 
     @Autowired AuditService auditService;
     @Autowired AuditLogRepository auditLogRepository;
+    @Autowired PatientRepository patientRepository;
     @Autowired JdbcTemplate jdbcTemplate;
 
     @Test
     void log_insertsRow_butUpdateAndDeleteAreRejectedByTrigger() {
         long before = countAuditRows();
 
-        UUID actorId = UUID.randomUUID();
+        // audit_logs.user_id is a FK to users(id); the actor must be a real persisted user.
+        User actor = patientRepository.save(User.builder()
+                .email("audit-actor-" + UUID.randomUUID() + "@example.com")
+                .passwordHash("x")
+                .role(UserRole.PATIENT)
+                .firstName("Audit")
+                .lastName("Actor")
+                .build());
+
+        UUID actorId = actor.getId();
         auditService.log(actorId, "TEST_ACTION", "audit_logs_immutability_test",
                 UUID.randomUUID(), "203.0.113.7");
 
