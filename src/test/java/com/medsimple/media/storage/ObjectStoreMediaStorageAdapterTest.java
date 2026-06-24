@@ -74,6 +74,23 @@ class ObjectStoreMediaStorageAdapterTest {
     }
 
     @Test
+    void load_resourceCarriesFilenameWithExtension_soWhisperVisionCanDetectFormat() {
+        // Regression: a bare ByteArrayResource has no filename, so OpenAI rejected the audio with
+        // "Unrecognized file format". The resource must expose {id}.{ext}.
+        UUID id = UUID.randomUUID();
+        GetObjectResponse resp = GetObjectResponse.builder()
+                .contentType("audio/webm")
+                .metadata(Map.of())
+                .build();
+        when(s3.getObjectAsBytes(any(GetObjectRequest.class)))
+                .thenReturn(ResponseBytes.fromByteArray(resp, new byte[]{1, 2}));
+
+        MediaContent content = adapter().load(id);
+
+        assertThat(content.resource().getFilename()).isEqualTo(id + ".webm");
+    }
+
+    @Test
     void load_unknownKey_throwsMediaNotFound() {
         when(s3.getObjectAsBytes(any(GetObjectRequest.class)))
                 .thenThrow(NoSuchKeyException.builder().message("no such key").build());
