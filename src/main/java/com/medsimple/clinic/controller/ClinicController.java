@@ -74,6 +74,13 @@ public class ClinicController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{id}/staff/{staffId}/verify")
+    @PreAuthorize("hasAnyRole('CLINIC_ADMIN','SUPER_ADMIN')")
+    public ResponseEntity<StaffResponse> verifyStaff(@PathVariable UUID id, @PathVariable UUID staffId,
+                                                     HttpServletRequest httpRequest) {
+        return ResponseEntity.ok(clinicService.verifyStaff(id, staffId, httpRequest.getRemoteAddr()));
+    }
+
     @PostMapping("/{id}/capabilities")
     @PreAuthorize("hasAnyRole('CLINIC_ADMIN','SUPER_ADMIN')")
     public ResponseEntity<CapabilityResponse> setCapability(@PathVariable UUID id,
