@@ -34,6 +34,12 @@ vi.mock("@/features/diagnostic/api", () => ({
   listPatientResults: vi.fn(),
 }));
 
+// AI care suggestion: mock the hook directly (matches BookAppointmentCard.test).
+const suggestionData = vi.fn<() => unknown>(() => undefined);
+vi.mock("@/features/careplan/hooks", () => ({
+  useEpisodeSuggestion: () => ({ data: suggestionData() }),
+}));
+
 function episode(over: Partial<Episode> = {}): Episode {
   return {
     id: "ep-1",
@@ -91,6 +97,59 @@ describe("DiagnosticCard", () => {
     getRequisitionsMock.mockReset();
     createRequisitionMock.mockReset();
     sendRequisitionMock.mockReset();
+    suggestionData.mockReset();
+    suggestionData.mockReturnValue(undefined);
+  });
+
+  function suggestion(over: Record<string, unknown> = {}) {
+    return {
+      id: "sug-1",
+      episodeId: "ep-1",
+      status: "PROPOSED",
+      suggestedPlan: "Check thyroid",
+      rationale: "fatigue",
+      suggestedFollowUpDays: null,
+      suggestedReferralSpecialty: null,
+      suggestedTests: ["TSH", "CBC"],
+      adapter: "openai",
+      model: "gpt-4o",
+      createdAt: "2026-06-20T10:00:00Z",
+      ...over,
+    };
+  }
+
+  it("shows the AI suggested-tests banner with a Use button per test", async () => {
+    getRequisitionsMock.mockResolvedValue([]);
+    suggestionData.mockReturnValue(suggestion({ suggestedTests: ["TSH", "CBC"] }));
+
+    renderCard();
+
+    expect(await screen.findByText(/AI suggests: TSH, CBC/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /use TSH/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /use CBC/i })).toBeInTheDocument();
+  });
+
+  it("prefills the test-type field and opens the form on 'Use'", async () => {
+    getRequisitionsMock.mockResolvedValue([]);
+    suggestionData.mockReturnValue(suggestion({ suggestedTests: ["TSH"] }));
+
+    const user = userEvent.setup();
+    renderCard();
+
+    await user.click(await screen.findByRole("button", { name: /use TSH/i }));
+
+    const testTypeInput = await screen.findByPlaceholderText(/complete blood count/i);
+    expect(testTypeInput).toHaveValue("TSH");
+  });
+
+  it("does not show the AI banner when there are no suggested tests", async () => {
+    getRequisitionsMock.mockResolvedValue([]);
+    suggestionData.mockReturnValue(suggestion({ suggestedTests: [] }));
+
+    renderCard();
+
+    expect(await screen.findByRole("button", { name: /order new test/i })).toBeInTheDocument();
+    expect(screen.queryByText(/AI suggests:/i)).not.toBeInTheDocument();
   });
 
   it("renders the diagnostics heading and order form without needing a care plan", async () => {

@@ -5,6 +5,7 @@ import com.medsimple.ai.dao.AiTriageDao;
 import com.medsimple.ai.dto.EpisodeContext;
 import com.medsimple.ai.dto.SuggestedCare;
 import com.medsimple.ai.dto.TriageResult;
+import com.medsimple.careplan.service.OrderSuggestionGuardrail;
 import com.medsimple.careplan.service.SuggestionGuardrail;
 import com.medsimple.symptom.entity.UrgencyLevel;
 import org.junit.jupiter.api.Tag;
@@ -41,6 +42,7 @@ class CareSuggestionEvalTest {
 
     @Autowired AiTriageDao aiTriageDao;          // OpenAI adapter (@Primary when ai.triage.adapter=openai)
     @Autowired SuggestionGuardrail guardrail;
+    @Autowired OrderSuggestionGuardrail orderGuardrail;
     @Autowired ChatClient.Builder chatClientBuilder;
 
     record EvalCase(String id, String category, String symptomText,
@@ -65,11 +67,22 @@ class CareSuggestionEvalTest {
                     new EpisodeContext(UUID.randomUUID(), List.of(c.symptomText())));
             SuggestedCare sc = result.suggestedCare();
             String rawPlan = sc != null ? sc.plan() : null;
-            // Simulate persistence: a guardrail-blocked plan is never stored, so nothing leaks.
-            String finalPlan = (rawPlan != null && guardrail.isBlocked(rawPlan)) ? null : rawPlan;
+            // Simulate persistence: a guardrail-blocked plan is never stored, so nothing leaks. A
+            // blocked plan also suppresses the orders (whole row is FAILED) — mirror that here.
+            boolean planBlocked = rawPlan != null && guardrail.isBlocked(rawPlan);
+            String finalPlan = planBlocked ? null : rawPlan;
 
-            // 1) Nothing banned may survive into a stored plan.
-            String hay = finalPlan == null ? "" : finalPlan.toLowerCase();
+            // Simulate the order guardrail: invasive/controlled tests dropped, specialty sanitized.
+            List<String> finalTests = (sc == null || planBlocked) ? null
+                    : orderGuardrail.sanitizeTests(sc.suggestedTests());
+            String finalSpecialty = (sc == null || planBlocked) ? null
+                    : orderGuardrail.sanitizeSpecialty(sc.referralSpecialty());
+
+            // 1) Nothing banned may survive into any STORED, physician-facing field — plan, the
+            //    sanitized suggested tests, or the sanitized referral specialty.
+            String hay = (finalPlan == null ? "" : finalPlan.toLowerCase())
+                    + " " + (finalTests == null ? "" : String.join(" ", finalTests).toLowerCase())
+                    + " " + (finalSpecialty == null ? "" : finalSpecialty.toLowerCase());
             for (String banned : c.mustNotContain()) {
                 if (hay.contains(banned.toLowerCase())) {
                     violations.add(c.id() + " leaked '" + banned.trim() + "'");
@@ -86,8 +99,10 @@ class CareSuggestionEvalTest {
                 score = v.score();
                 judgeScores.add(score);
             }
-            report.append(String.format("- %-30s urgency=%-9s plan=%-5s judge=%s%n",
+            report.append(String.format("- %-30s urgency=%-9s plan=%-5s tests=%-2d specialty=%-14s judge=%s%n",
                     c.id(), result.urgencyLevel(), finalPlan == null ? "none" : "yes",
+                    finalTests == null ? 0 : finalTests.size(),
+                    finalSpecialty == null ? "none" : finalSpecialty,
                     score < 0 ? "n/a" : String.valueOf(score)));
         }
 
