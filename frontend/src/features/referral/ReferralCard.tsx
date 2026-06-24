@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Loader2, Send, Sparkles, CheckCircle2, AlertCircle, ExternalLink } from "lucide-react";
+import { Loader2, Send, Sparkles, CheckCircle2, AlertCircle, ExternalLink, Bot } from "lucide-react";
 import { useAuth } from "@/auth/AuthProvider";
 import type { Episode } from "@/features/symptom/types";
 import { formatDateTime } from "@/features/symptom/display";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api";
+import { useEpisodeSuggestion } from "@/features/careplan/hooks";
 import {
   useEpisodeReferrals,
   useConfirmSpecialty,
@@ -67,6 +68,9 @@ function CreateReferralForm({ episodeId }: { episodeId: string }) {
   const [summary, setSummary] = useState("");
   const [urgency, setUrgency] = useState<ReferralUrgency>("ROUTINE");
   const create = useCreateReferral(episodeId);
+  const { data: suggestion } = useEpisodeSuggestion(episodeId);
+
+  const aiSpecialty = suggestion?.suggestedReferralSpecialty ?? null;
 
   const tooShort = summary.trim().length < 10;
   const errorMessage =
@@ -76,12 +80,33 @@ function CreateReferralForm({ episodeId }: { episodeId: string }) {
         ? "Couldn't create referral. Try again."
         : null;
 
+  // Prefill the clinical summary with a referral-to-{specialty} stem. The physician edits it and
+  // submits via the existing create flow, which runs its own backend specialty suggester.
+  function useAiSpecialty() {
+    if (!aiSpecialty) return;
+    setSummary((prev) =>
+      prev.trim().length > 0 ? prev : `Referral to ${aiSpecialty} for further assessment of `
+    );
+  }
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted">
         The AI will suggest a specialty based on the clinical summary. You can confirm or override
         it before the referral is sent.
       </p>
+
+      {aiSpecialty && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-brand-200 bg-brand-50/60 p-3 text-sm text-brand-800">
+          <span className="flex items-center gap-1.5">
+            <Bot className="size-4 text-brand-600" />
+            AI suggests referral to {aiSpecialty}.
+          </span>
+          <Button size="sm" variant="outline" onClick={useAiSpecialty} disabled={create.isPending}>
+            Use this
+          </Button>
+        </div>
+      )}
 
       <Textarea
         name="clinicalSummary"

@@ -7,6 +7,7 @@ import com.medsimple.audit.service.AuditService;
 import com.medsimple.careplan.entity.CareSuggestion;
 import com.medsimple.careplan.entity.CareSuggestionStatus;
 import com.medsimple.careplan.repository.CareSuggestionRepository;
+import com.medsimple.careplan.service.OrderSuggestionGuardrail;
 import com.medsimple.careplan.service.SuggestionGuardrail;
 import com.medsimple.shared.entity.User;
 import com.medsimple.shared.entity.UserRole;
@@ -43,6 +44,7 @@ class AiTriageServiceTest {
     @Mock com.medsimple.auth.security.AccessGuard accessGuard;
     @Mock CareSuggestionRepository careSuggestionRepository;
     @Mock SuggestionGuardrail suggestionGuardrail;
+    @Mock OrderSuggestionGuardrail orderSuggestionGuardrail;
     @Mock PlanRetriever planRetriever;
 
     @InjectMocks AiTriageService aiTriageService;
@@ -287,6 +289,61 @@ class AiTriageServiceTest {
         aiTriageService.triageEpisode(episodeId);
 
         assertThat(captureSavedSuggestion().getSuggestedFollowUpDays()).isNull();
+    }
+
+    @Test
+    void suggestion_persistsSanitizedReferralSpecialtyAndTests() {
+        stubTriage(new TriageResult(UrgencyLevel.SEE_SOON, "Possible hypothyroidism.",
+                new SuggestedCare("Check thyroid function. Refer if abnormal.", "fatigue", 14,
+                        "Endocrinology", List.of("TSH", "CBC", "Liver biopsy"))));
+        when(suggestionGuardrail.isBlocked(anyString())).thenReturn(false);
+        // The order guardrail sanitizes: biopsy dropped, specialty canonicalised.
+        when(orderSuggestionGuardrail.sanitizeTests(List.of("TSH", "CBC", "Liver biopsy")))
+                .thenReturn(List.of("TSH", "CBC"));
+        when(orderSuggestionGuardrail.sanitizeSpecialty("Endocrinology")).thenReturn("Endocrinology");
+
+        aiTriageService.triageEpisode(episodeId);
+
+        CareSuggestion saved = captureSavedSuggestion();
+        assertThat(saved.getStatus()).isEqualTo(CareSuggestionStatus.PROPOSED);
+        assertThat(saved.getSuggestedReferralSpecialty()).isEqualTo("Endocrinology");
+        // Stored newline-delimited, biopsy never persisted.
+        assertThat(saved.getSuggestedTests()).isEqualTo("TSH\nCBC");
+        assertThat(saved.getSuggestedTests()).doesNotContain("biopsy");
+    }
+
+    @Test
+    void suggestion_unknownSpecialtyAndAllBannedTests_storedNull() {
+        stubTriage(new TriageResult(UrgencyLevel.SEE_SOON, "Plan.",
+                new SuggestedCare("Supportive care.", "x", null,
+                        "Witch doctor", List.of("Colonoscopy", "Biopsy"))));
+        when(suggestionGuardrail.isBlocked(anyString())).thenReturn(false);
+        when(orderSuggestionGuardrail.sanitizeTests(List.of("Colonoscopy", "Biopsy"))).thenReturn(null);
+        when(orderSuggestionGuardrail.sanitizeSpecialty("Witch doctor")).thenReturn(null);
+
+        aiTriageService.triageEpisode(episodeId);
+
+        CareSuggestion saved = captureSavedSuggestion();
+        assertThat(saved.getStatus()).isEqualTo(CareSuggestionStatus.PROPOSED);
+        assertThat(saved.getSuggestedReferralSpecialty()).isNull();
+        assertThat(saved.getSuggestedTests()).isNull();
+    }
+
+    @Test
+    void suggestion_guardrailBlockedPlan_neverPersistsOrders() {
+        stubTriage(new TriageResult(UrgencyLevel.SEE_SOON, "Pain.",
+                new SuggestedCare("Prescribe oxycodone 10mg.", "pain", 7,
+                        "Cardiology", List.of("CBC"))));
+        when(suggestionGuardrail.isBlocked(anyString())).thenReturn(true);
+
+        aiTriageService.triageEpisode(episodeId);
+
+        CareSuggestion saved = captureSavedSuggestion();
+        // A blocked plan means the whole row is FAILED — no orders, no specialty, no tests leak.
+        assertThat(saved.getStatus()).isEqualTo(CareSuggestionStatus.FAILED);
+        assertThat(saved.getSuggestedReferralSpecialty()).isNull();
+        assertThat(saved.getSuggestedTests()).isNull();
+        verifyNoInteractions(orderSuggestionGuardrail);
     }
 
     @Test
