@@ -27,7 +27,9 @@ describe("PhotoCapture", () => {
 
   it("rejects a non-image file with an error and emits nothing", async () => {
     const onChange = vi.fn();
-    const user = userEvent.setup();
+    // applyAccept:false (a setup option) so userEvent doesn't pre-filter on the input's accept=
+    // attribute — we want the non-image to reach the component so its own validation produces the error.
+    const user = userEvent.setup({ applyAccept: false });
     render(<PhotoCapture onChange={onChange} />);
 
     const pdf = new File(["x"], "doc.pdf", { type: "application/pdf" });
