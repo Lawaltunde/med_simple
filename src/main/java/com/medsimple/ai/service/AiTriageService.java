@@ -128,12 +128,18 @@ public class AiTriageService {
         } else {
             builder.status(CareSuggestionStatus.PROPOSED)
                     .suggestedPlan(sc.plan())
-                    .rationale(sc.rationale());
+                    .rationale(sc.rationale())
+                    .suggestedFollowUpDays(sanitizeFollowUp(sc.followUpDays()));
         }
 
         CareSuggestion saved = careSuggestionRepository.save(builder.build());
         auditService.log(episode.getPatient().getId(), "CARE_SUGGESTION_GENERATED",
                 "care_suggestions", saved.getId(), null);
+    }
+
+    // Keep the AI's follow-up interval sane: only accept 1..90 days, else drop it.
+    private Integer sanitizeFollowUp(Integer days) {
+        return (days != null && days >= 1 && days <= 90) ? days : null;
     }
 
     private List<String> collectSymptomTexts(UUID episodeId) {
