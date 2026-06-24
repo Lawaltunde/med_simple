@@ -7,11 +7,13 @@ import {
   AlertCircle,
   Sparkles,
   XCircle,
+  Bot,
 } from "lucide-react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api";
+import { useEpisodeSuggestion } from "@/features/careplan/hooks";
 import type { Episode } from "@/features/symptom/types";
 import type { Requisition, PhysicianResult, RequisitionUrgency } from "./types";
 import { RequisitionStatusBadge, UrgencyBadge } from "./display";
@@ -309,6 +311,8 @@ function CreateRequisitionForm({ episodeId }: { episodeId: string }) {
   const [open, setOpen] = useState(false);
 
   const create = useCreateRequisition();
+  const { data: suggestion } = useEpisodeSuggestion(episodeId);
+  const aiTests = suggestion?.suggestedTests ?? [];
 
   const createError =
     create.error instanceof ApiError
@@ -316,6 +320,13 @@ function CreateRequisitionForm({ episodeId }: { episodeId: string }) {
       : create.error
       ? "Failed to create requisition"
       : null;
+
+  // Open the order form and prefill the test-type field with an AI-suggested test. The physician
+  // edits the requisition and creates it via the existing flow — nothing is auto-ordered.
+  function useAiTest(test: string) {
+    setOpen(true);
+    setTestType(test);
+  }
 
   function submit() {
     if (testType.trim().length < 2) return;
@@ -334,9 +345,31 @@ function CreateRequisitionForm({ episodeId }: { episodeId: string }) {
 
   if (!open) {
     return (
-      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-        <FlaskConical className="size-4" /> Order new test
-      </Button>
+      <div className="space-y-3">
+        {aiTests.length > 0 && (
+          <div className="rounded-xl border border-brand-200 bg-brand-50/60 p-3 text-sm text-brand-800">
+            <p className="flex items-center gap-1.5 font-medium">
+              <Bot className="size-4 text-brand-600" />
+              AI suggests: {aiTests.join(", ")}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {aiTests.map((test) => (
+                <Button
+                  key={test}
+                  size="sm"
+                  variant="outline"
+                  onClick={() => useAiTest(test)}
+                >
+                  Use {test}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+        <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+          <FlaskConical className="size-4" /> Order new test
+        </Button>
+      </div>
     );
   }
 

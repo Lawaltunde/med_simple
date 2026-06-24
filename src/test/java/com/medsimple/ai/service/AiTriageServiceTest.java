@@ -7,7 +7,9 @@ import com.medsimple.audit.service.AuditService;
 import com.medsimple.careplan.entity.CareSuggestion;
 import com.medsimple.careplan.entity.CareSuggestionStatus;
 import com.medsimple.careplan.repository.CareSuggestionRepository;
+import com.medsimple.careplan.service.OrderSuggestionGuardrail;
 import com.medsimple.careplan.service.SuggestionGuardrail;
+import com.medsimple.shared.privacy.SymptomRedactor;
 import com.medsimple.shared.entity.User;
 import com.medsimple.shared.entity.UserRole;
 import com.medsimple.symptom.dto.EpisodeResponse;
@@ -21,6 +23,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.OffsetDateTime;
@@ -43,7 +46,11 @@ class AiTriageServiceTest {
     @Mock com.medsimple.auth.security.AccessGuard accessGuard;
     @Mock CareSuggestionRepository careSuggestionRepository;
     @Mock SuggestionGuardrail suggestionGuardrail;
+    @Mock OrderSuggestionGuardrail orderSuggestionGuardrail;
     @Mock PlanRetriever planRetriever;
+    // Real redactor (not a mock): the wiring test below proves PHI is actually stripped before the
+    // adapter sees it, and clinical fixtures ("headache") pass through unchanged.
+    @Spy SymptomRedactor symptomRedactor = new SymptomRedactor();
 
     @InjectMocks AiTriageService aiTriageService;
 
@@ -152,6 +159,37 @@ class AiTriageServiceTest {
         // Verify AI only received 1 symptom (the completed one, not the pending voice)
         verify(aiTriageDao).analyze(argThat(ctx -> ctx.symptoms().size() == 1
                 && ctx.symptoms().get(0).equals("headache")));
+    }
+
+    @Test
+    void triage_redactsPhiFromSymptomTextBeforeReachingAdapter() {
+        // A patient pastes their name, OHIP number, phone and email into the symptom box.
+        SymptomSubmission leaky = textSubmission(
+                "My name is John Smith, OHIP 1234-567-890, call 416-555-0199 "
+                        + "or email john@example.com. I have chest pain.");
+
+        when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
+        when(submissionRepository.findByEpisodeIdOrderBySubmittedAtAsc(episodeId))
+                .thenReturn(List.of(leaky));
+        when(aiTriageDao.analyze(any())).thenReturn(
+                new TriageResult(UrgencyLevel.URGENT, "Chest pain, assess promptly."));
+        when(episodeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        aiTriageService.triageEpisode(episodeId);
+
+        ArgumentCaptor<com.medsimple.ai.dto.EpisodeContext> ctx =
+                ArgumentCaptor.forClass(com.medsimple.ai.dto.EpisodeContext.class);
+        verify(aiTriageDao).analyze(ctx.capture());
+
+        String sent = String.join(" ", ctx.getValue().symptoms());
+        // No raw PHI leaves for the model.
+        assertThat(sent)
+                .doesNotContain("John Smith")
+                .doesNotContain("1234-567-890")
+                .doesNotContain("416-555-0199")
+                .doesNotContain("john@example.com");
+        // The placeholders are present and the clinical signal survives.
+        assertThat(sent).contains("[NAME]", "[HEALTH_CARD]", "[PHONE]", "[EMAIL]", "chest pain");
     }
 
     @Test
@@ -311,6 +349,61 @@ class AiTriageServiceTest {
         aiTriageService.triageEpisode(episodeId);
 
         assertThat(captureSavedSuggestion().getSuggestedFollowUpDays()).isNull();
+    }
+
+    @Test
+    void suggestion_persistsSanitizedReferralSpecialtyAndTests() {
+        stubTriage(new TriageResult(UrgencyLevel.SEE_SOON, "Possible hypothyroidism.",
+                new SuggestedCare("Check thyroid function. Refer if abnormal.", "fatigue", 14,
+                        "Endocrinology", List.of("TSH", "CBC", "Liver biopsy"))));
+        when(suggestionGuardrail.isBlocked(anyString())).thenReturn(false);
+        // The order guardrail sanitizes: biopsy dropped, specialty canonicalised.
+        when(orderSuggestionGuardrail.sanitizeTests(List.of("TSH", "CBC", "Liver biopsy")))
+                .thenReturn(List.of("TSH", "CBC"));
+        when(orderSuggestionGuardrail.sanitizeSpecialty("Endocrinology")).thenReturn("Endocrinology");
+
+        aiTriageService.triageEpisode(episodeId);
+
+        CareSuggestion saved = captureSavedSuggestion();
+        assertThat(saved.getStatus()).isEqualTo(CareSuggestionStatus.PROPOSED);
+        assertThat(saved.getSuggestedReferralSpecialty()).isEqualTo("Endocrinology");
+        // Stored newline-delimited, biopsy never persisted.
+        assertThat(saved.getSuggestedTests()).isEqualTo("TSH\nCBC");
+        assertThat(saved.getSuggestedTests()).doesNotContain("biopsy");
+    }
+
+    @Test
+    void suggestion_unknownSpecialtyAndAllBannedTests_storedNull() {
+        stubTriage(new TriageResult(UrgencyLevel.SEE_SOON, "Plan.",
+                new SuggestedCare("Supportive care.", "x", null,
+                        "Witch doctor", List.of("Colonoscopy", "Biopsy"))));
+        when(suggestionGuardrail.isBlocked(anyString())).thenReturn(false);
+        when(orderSuggestionGuardrail.sanitizeTests(List.of("Colonoscopy", "Biopsy"))).thenReturn(null);
+        when(orderSuggestionGuardrail.sanitizeSpecialty("Witch doctor")).thenReturn(null);
+
+        aiTriageService.triageEpisode(episodeId);
+
+        CareSuggestion saved = captureSavedSuggestion();
+        assertThat(saved.getStatus()).isEqualTo(CareSuggestionStatus.PROPOSED);
+        assertThat(saved.getSuggestedReferralSpecialty()).isNull();
+        assertThat(saved.getSuggestedTests()).isNull();
+    }
+
+    @Test
+    void suggestion_guardrailBlockedPlan_neverPersistsOrders() {
+        stubTriage(new TriageResult(UrgencyLevel.SEE_SOON, "Pain.",
+                new SuggestedCare("Prescribe oxycodone 10mg.", "pain", 7,
+                        "Cardiology", List.of("CBC"))));
+        when(suggestionGuardrail.isBlocked(anyString())).thenReturn(true);
+
+        aiTriageService.triageEpisode(episodeId);
+
+        CareSuggestion saved = captureSavedSuggestion();
+        // A blocked plan means the whole row is FAILED — no orders, no specialty, no tests leak.
+        assertThat(saved.getStatus()).isEqualTo(CareSuggestionStatus.FAILED);
+        assertThat(saved.getSuggestedReferralSpecialty()).isNull();
+        assertThat(saved.getSuggestedTests()).isNull();
+        verifyNoInteractions(orderSuggestionGuardrail);
     }
 
     @Test
