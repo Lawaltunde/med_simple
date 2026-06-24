@@ -12,6 +12,9 @@ import com.medsimple.referral.entity.ReferralStatus;
 import com.medsimple.referral.exception.InvalidReferralStateException;
 import com.medsimple.referral.exception.ReferralNotFoundException;
 import com.medsimple.referral.repository.ReferralRepository;
+import com.medsimple.symptom.entity.SymptomEpisode;
+import com.medsimple.symptom.exception.EpisodeNotFoundException;
+import com.medsimple.symptom.repository.SymptomEpisodeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +29,7 @@ public class ReferralService {
 
     private final ReferralRepository referralRepository;
     private final CarePlanRepository carePlanRepository;
+    private final SymptomEpisodeRepository episodeRepository;
     private final SpecialtySuggestionDao specialtySuggestionDao;
     private final ReferralDeliveryResolver deliveryResolver;
     private final AuditService auditService;
@@ -33,16 +37,22 @@ public class ReferralService {
 
     @Transactional
     public ReferralResponse createReferral(CreateReferralRequest request, String ipAddress) {
-        CarePlan carePlan = carePlanRepository.findById(request.carePlanId())
-                .orElseThrow(() -> new CarePlanNotFoundException(request.carePlanId()));
+        // Referrals hang off the episode (the encounter), not the care plan. The physician must
+        // have taken the episode (assigned to them) first.
+        SymptomEpisode episode = episodeRepository.findById(request.episodeId())
+                .orElseThrow(() -> new EpisodeNotFoundException(request.episodeId()));
+        if (episode.getAssignedClinic() == null || episode.getAssignedPhysician() == null) {
+            throw new IllegalStateException(
+                    "Episode " + request.episodeId() + " must be assigned to a physician before referring");
+        }
 
         // PHI-stripped: only the clinical summary text reaches the AI.
         SpecialtySuggestion suggestion = specialtySuggestionDao.suggest(request.clinicalSummary());
 
         Referral referral = Referral.builder()
-                .carePlan(carePlan)
-                .patient(carePlan.getPatient())
-                .referringPhysician(carePlan.getPhysician())
+                .episode(episode)
+                .patient(episode.getPatient())
+                .referringPhysician(episode.getAssignedPhysician())
                 .aiSuggestedSpecialty(suggestion.specialty())
                 .clinicalSummary(request.clinicalSummary())
                 .urgency(request.urgency())
@@ -50,7 +60,7 @@ public class ReferralService {
                 .build();
 
         Referral saved = referralRepository.save(referral);
-        auditService.log(carePlan.getPhysician().getId(), "REFERRAL_CREATED",
+        auditService.log(episode.getAssignedPhysician().getId(), "REFERRAL_CREATED",
                 "referrals", saved.getId(), ipAddress);
         return toResponse(saved);
     }
@@ -63,6 +73,14 @@ public class ReferralService {
     @Transactional(readOnly = true)
     public List<ReferralResponse> getCarePlanReferrals(UUID carePlanId) {
         return referralRepository.findByCarePlanIdOrderByCreatedAtDesc(carePlanId)
+                .stream().map(this::toResponse).toList();
+    }
+
+    // Staff-facing: the referrals made for an episode (the console's referral list).
+    @Transactional(readOnly = true)
+    public List<ReferralResponse> getEpisodeReferrals(UUID episodeId) {
+        accessGuard.requireStaff();
+        return referralRepository.findByEpisodeIdOrderByCreatedAtDesc(episodeId)
                 .stream().map(this::toResponse).toList();
     }
 
@@ -163,7 +181,8 @@ public class ReferralService {
     private ReferralResponse toResponse(Referral r) {
         return new ReferralResponse(
                 r.getId(),
-                r.getCarePlan().getId(),
+                r.getEpisode().getId(),
+                r.getCarePlan() != null ? r.getCarePlan().getId() : null,
                 r.getPatient().getId(),
                 r.getReferringPhysician().getId(),
                 r.getAiSuggestedSpecialty(),

@@ -1,9 +1,9 @@
 import { api } from "@/lib/api";
 import type { Referral } from "./types";
 
-// Physician creates a referral for a care plan. Backend calls the AI specialty suggester.
+// Physician refers off the episode (no care plan needed). Backend calls the AI specialty suggester.
 export function createReferral(input: {
-  carePlanId: string;
+  episodeId: string;
   clinicalSummary: string;
   urgency: "ROUTINE" | "URGENT" | "EMERGENT";
 }): Promise<Referral> {
@@ -14,9 +14,9 @@ export function getReferral(id: string): Promise<Referral> {
   return api<Referral>(`/referrals/${id}`);
 }
 
-// List all referrals for a care plan (physician view — by plan).
-export function getCarePlanReferrals(carePlanId: string): Promise<Referral[]> {
-  return api<Referral[]>(`/care-plans/${carePlanId}/referrals`);
+// List all referrals for an episode (physician/console view).
+export function getEpisodeReferrals(episodeId: string): Promise<Referral[]> {
+  return api<Referral[]>(`/episodes/${episodeId}/referrals`);
 }
 
 // List all referrals for a patient (patient view — newest first).

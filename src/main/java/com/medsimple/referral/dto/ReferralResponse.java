@@ -9,6 +9,7 @@ import java.util.UUID;
 
 public record ReferralResponse(
         UUID id,
+        UUID episodeId,
         UUID carePlanId,
         UUID patientId,
         UUID referringPhysicianId,

@@ -12,5 +12,7 @@ public interface ReferralRepository extends JpaRepository<Referral, UUID> {
 
     List<Referral> findByCarePlanIdOrderByCreatedAtDesc(UUID carePlanId);
 
+    List<Referral> findByEpisodeIdOrderByCreatedAtDesc(UUID episodeId);
+
     List<Referral> findByPatientIdOrderByCreatedAtDesc(UUID patientId);
 }

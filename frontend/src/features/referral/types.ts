@@ -6,7 +6,8 @@ export type ReferralDeliveryMethod = "OCEAN_EREFERRAL" | "PDF_FAX" | "PDF_PRINT"
 
 export interface Referral {
   id: string;
-  carePlanId: string;
+  episodeId: string;
+  carePlanId: string | null;
   patientId: string;
   referringPhysicianId: string;
   aiSuggestedSpecialty: string;
