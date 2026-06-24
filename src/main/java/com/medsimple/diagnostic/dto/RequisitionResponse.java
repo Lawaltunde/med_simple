@@ -10,6 +10,7 @@ import java.util.UUID;
 
 public record RequisitionResponse(
         UUID id,
+        UUID episodeId,
         UUID carePlanId,
         UUID patientId,
         UUID orderingPhysicianId,

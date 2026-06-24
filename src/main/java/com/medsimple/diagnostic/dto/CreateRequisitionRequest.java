@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.UUID;
 
 public record CreateRequisitionRequest(
-        @NotNull UUID carePlanId,
+        @NotNull UUID episodeId,
         @NotBlank String testType,
         List<String> testCodes,
         String clinicalIndication,

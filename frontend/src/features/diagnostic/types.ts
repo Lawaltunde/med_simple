@@ -16,7 +16,8 @@ export type DiagnosticDeliveryMethod = "ELECTRONIC" | "PDF_PRINT";
 // Mirrors RequisitionResponse.
 export interface Requisition {
   id: string;
-  carePlanId: string;
+  episodeId: string;
+  carePlanId: string | null;
   patientId: string;
   orderingPhysicianId: string;
   testType: string;
