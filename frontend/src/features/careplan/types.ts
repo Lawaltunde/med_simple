@@ -37,6 +37,10 @@ export interface CareSuggestion {
   suggestedPlan: string | null;
   rationale: string | null;
   suggestedFollowUpDays: number | null;
+  // AI-suggested orders, sanitized server-side. The physician one-click-prefills the existing
+  // referral / diagnostic create form from these; nothing here is auto-submitted.
+  suggestedReferralSpecialty: string | null;
+  suggestedTests: string[];
   adapter: string;
   model: string | null;
   createdAt: string;

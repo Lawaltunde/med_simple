@@ -44,6 +44,16 @@ public class CareSuggestion {
     @Column(name = "suggested_followup_days")
     private Integer suggestedFollowUpDays;
 
+    // The AI's suggested referral specialty (nullable), sanitized to a recognised specialty before
+    // storage. The physician one-click-prefills the referral create form, then reviews/submits.
+    @Column(name = "suggested_referral_specialty", length = 100)
+    private String suggestedReferralSpecialty;
+
+    // The AI's suggested diagnostic tests (nullable), newline-delimited after the guardrail has
+    // dropped any invasive/controlled item and capped the count. Null for FAILED/blocked rows.
+    @Column(name = "suggested_tests", columnDefinition = "TEXT")
+    private String suggestedTests;
+
     @Column(nullable = false)
     private String adapter;   // 'openai' | 'fallback'
 

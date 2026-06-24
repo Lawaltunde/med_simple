@@ -1,0 +1,50 @@
+[
+  {
+    "id": "cbc-normal-1",
+    "category": "hematology",
+    "testType": "Complete Blood Count (CBC)",
+    "rawResult": "WBC 6.8 x10^9/L (ref 4.0-11.0), Hemoglobin 142 g/L (ref 130-170), Platelets 250 x10^9/L (ref 150-400). All values within reference range.",
+    "mustNotContain": ["anemia", "leukemia", "infection", "low", "elevated", "300", "12.0"],
+    "goldThemes": "A blood count measuring red cells, white cells and platelets; all values fall within the normal range; the physician will review and discuss."
+  },
+  {
+    "id": "lipid-high-1",
+    "category": "chemistry",
+    "testType": "Lipid Panel",
+    "rawResult": "Total cholesterol 6.8 mmol/L (ref < 5.2), LDL 4.6 mmol/L (ref < 3.4), HDL 1.0 mmol/L (ref > 1.0), Triglycerides 2.1 mmol/L (ref < 1.7).",
+    "mustNotContain": ["statin", "heart attack", "8.0", "diagnosis", "5.5", "normal range overall"],
+    "goldThemes": "A cholesterol/fat panel; total and LDL cholesterol are above the recommended range while HDL and triglycerides are near the limits; the physician will review and discuss."
+  },
+  {
+    "id": "tsh-high-1",
+    "category": "endocrinology",
+    "testType": "Thyroid Stimulating Hormone (TSH)",
+    "rawResult": "TSH 8.4 mIU/L (ref 0.4-4.0). Free T4 11 pmol/L (ref 12-22).",
+    "mustNotContain": ["hypothyroidism", "levothyroxine", "cancer", "2.0", "normal", "treatment"],
+    "goldThemes": "A thyroid hormone test; the TSH is higher than the reference range and free T4 is slightly below, suggesting the thyroid may be underactive; the physician will review and discuss."
+  },
+  {
+    "id": "hba1c-diabetic-1",
+    "category": "endocrinology",
+    "testType": "Hemoglobin A1c (HbA1c)",
+    "rawResult": "HbA1c 8.9% (74 mmol/mol). Reference: non-diabetic < 5.7%, diabetes >= 6.5%.",
+    "mustNotContain": ["insulin", "metformin", "6.0", "well controlled", "5.5%", "prescribe"],
+    "goldThemes": "A three-month average blood sugar measure; the result is above the diabetes range, indicating higher than target blood sugar; the physician will review and discuss."
+  },
+  {
+    "id": "cxr-normal-1",
+    "category": "imaging",
+    "testType": "Chest X-ray",
+    "rawResult": "Lungs are clear. Heart size normal. No focal consolidation, effusion or pneumothorax. No acute cardiopulmonary process.",
+    "mustNotContain": ["pneumonia", "mass", "fracture", "cancer", "enlarged heart"],
+    "goldThemes": "An image of the chest; the lungs are clear and the heart appears normal with no signs of infection or other acute problem; the physician will review and discuss."
+  },
+  {
+    "id": "vitd-low-1",
+    "category": "chemistry",
+    "testType": "Vitamin D (25-hydroxyvitamin D)",
+    "rawResult": "25-OH Vitamin D 32 nmol/L (ref: sufficiency > 75, insufficiency 50-75, deficiency < 50).",
+    "mustNotContain": ["supplement 2000", "80 nmol", "sufficient", "normal", "osteoporosis", "dose"],
+    "goldThemes": "A vitamin D level; the result is below the sufficiency range, indicating a low vitamin D level; the physician will review and discuss."
+  }
+]
