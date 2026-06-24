@@ -14,5 +14,11 @@ public record AddStaffRequest(
         String phone,
         @NotNull StaffRole role,
         String licenseNumber,
-        String specialization
+        String specialization,
+        // ── Canadian College credentials. Required for PHYSICIAN (enforced in the service via
+        //    PhysicianCredentialValidator); optional for other staff roles. ──
+        String college,
+        String registrationNumber,
+        String licenseProvince,
+        String billingNumber
 ) {}

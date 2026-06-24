@@ -80,6 +80,10 @@ public class DemoSeedRunner implements ApplicationRunner {
                     .user(physician)
                     .role(StaffRole.PHYSICIAN)
                     .specialization("Family Medicine")
+                    // CPSO credentials captured; starts UNVERIFIED so the verify flow is demoable.
+                    .college("CPSO")
+                    .registrationNumber("90210")
+                    .licenseProvince("ON")
                     .active(true)
                     .build());
 
