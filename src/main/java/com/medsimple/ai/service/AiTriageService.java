@@ -146,15 +146,25 @@ public class AiTriageService {
         return submissionRepository.findByEpisodeIdOrderBySubmittedAtAsc(episodeId)
                 .stream()
                 .filter(s -> s.getProcessingStatus() == ProcessingStatus.COMPLETED)
-                .map(s -> {
-                    // Prefer transcription for voice; fall back to text content
-                    if (s.getTranscription() != null && !s.getTranscription().isBlank()) {
-                        return s.getTranscription();
-                    }
-                    return s.getTextContent() != null ? s.getTextContent() : "";
-                })
+                .map(this::symptomTextOf)
                 .filter(text -> !text.isBlank())
                 .toList();
+    }
+
+    // The triage-relevant text for one submission, by input type:
+    //   VOICE → the Whisper transcription
+    //   PHOTO → the vision adapter's clinical description (aiAnalysisResult)
+    //   TEXT  → the typed content
+    // A photo-only episode would otherwise carry no text and fail triage, so the analysis
+    // result is treated as symptom text here.
+    private String symptomTextOf(SymptomSubmission s) {
+        if (s.getTranscription() != null && !s.getTranscription().isBlank()) {
+            return s.getTranscription();
+        }
+        if (s.getAiAnalysisResult() != null && !s.getAiAnalysisResult().isBlank()) {
+            return s.getAiAnalysisResult();
+        }
+        return s.getTextContent() != null ? s.getTextContent() : "";
     }
 
     private EpisodeResponse toResponse(SymptomEpisode e, List<SymptomSubmission> submissions) {

@@ -43,7 +43,7 @@ class MediaProcessingControllerTest {
         ProcessedSubmissionResponse response = new ProcessedSubmissionResponse(
                 submissionId, InputType.PHOTO, "storage://p.jpg", null,
                 "Erythematous rash on the forearm", ProcessingStatus.COMPLETED);
-        when(mediaProcessingService.process(submissionId)).thenReturn(response);
+        when(mediaProcessingService.processForCaller(submissionId)).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/submissions/{id}/process", submissionId))
                 .andExpect(status().isOk())
@@ -53,7 +53,7 @@ class MediaProcessingControllerTest {
 
     @Test
     void process_notFound_returns404() throws Exception {
-        when(mediaProcessingService.process(submissionId))
+        when(mediaProcessingService.processForCaller(submissionId))
                 .thenThrow(new SubmissionNotFoundException(submissionId));
 
         mockMvc.perform(post("/api/v1/submissions/{id}/process", submissionId))

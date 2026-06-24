@@ -3,6 +3,7 @@ import { ArrowLeft, Loader2, Sparkles, MessageSquareText, Mic, Camera, type Luci
 import { useEpisode } from "@/features/symptom/hooks";
 import { effectiveUrgency, type InputType } from "@/features/symptom/types";
 import { UrgencyBadge, urgencyMeta, statusLabel, formatDateTime } from "@/features/symptom/display";
+import { AuthedMedia } from "@/features/media/AuthedMedia";
 import { buttonVariants } from "@/components/ui/button";
 
 const INPUT_ICON: Record<InputType, LucideIcon> = {
@@ -66,11 +67,22 @@ export function EpisodeDetail() {
                     <span className="mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
                       <Icon className="size-4" />
                     </span>
-                    <div className="min-w-0">
+                    <div className="min-w-0 space-y-2">
+                      {/* The original photo / voice note, fetched with auth. */}
+                      {s.mediaUrl && (s.inputType === "PHOTO" || s.inputType === "VOICE") && (
+                        <AuthedMedia mediaUrl={s.mediaUrl} inputType={s.inputType} />
+                      )}
                       <p className="text-[0.95rem] text-ink">
-                        {s.textContent || s.transcription || s.aiAnalysisResult || "(media submission)"}
+                        {s.textContent ||
+                          s.transcription ||
+                          s.aiAnalysisResult ||
+                          (s.processingStatus === "PENDING" || s.processingStatus === "PROCESSING"
+                            ? s.inputType === "PHOTO"
+                              ? "Analyzing your photo…"
+                              : "Transcribing your voice note…"
+                            : "(media submission)")}
                       </p>
-                      <p className="mt-1 text-xs text-muted">{formatDateTime(s.submittedAt)}</p>
+                      <p className="text-xs text-muted">{formatDateTime(s.submittedAt)}</p>
                     </div>
                   </li>
                 );

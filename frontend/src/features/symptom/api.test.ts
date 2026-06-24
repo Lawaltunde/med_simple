@@ -1,10 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { api } from "@/lib/api";
-import { submitTextSymptomCheck } from "./api";
+import { uploadMedia } from "@/features/media/api";
+import { submitTextSymptomCheck, submitMediaSymptomCheck } from "./api";
 import type { Episode } from "./types";
 
-vi.mock("@/lib/api", () => ({ api: vi.fn() }));
+vi.mock("@/lib/api", () => ({ api: vi.fn(), tokenStore: { get: () => "tok" } }));
+vi.mock("@/features/media/api", async (orig) => ({
+  ...(await orig<typeof import("@/features/media/api")>()),
+  uploadMedia: vi.fn(),
+}));
 const mockApi = vi.mocked(api);
+const mockUpload = vi.mocked(uploadMedia);
 
 function episode(overrides: Partial<Episode> = {}): Episode {
   return {
@@ -73,5 +79,44 @@ describe("submitTextSymptomCheck", () => {
 
     await expect(submitTextSymptomCheck({ patientId: "p1", description: "anything here" })).rejects.toThrow("boom");
     expect(mockApi).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("submitMediaSymptomCheck", () => {
+  beforeEach(() => {
+    mockApi.mockReset();
+    mockUpload.mockReset();
+  });
+
+  it("uploads, creates the episode, adds the media submission, processes it, then triages — in order", async () => {
+    mockUpload.mockResolvedValueOnce({ mediaUrl: "/api/v1/media/m1", contentType: "image/png" });
+    mockApi
+      .mockResolvedValueOnce(episode({ id: "ep5", status: "SUBMITTED" })) // start
+      .mockResolvedValueOnce({ id: "sub9" }) // addSubmission
+      .mockResolvedValueOnce({ id: "sub9", processingStatus: "COMPLETED" }) // process
+      .mockResolvedValueOnce(episode({ id: "ep5", status: "AI_ANALYZED", aiUrgencyLevel: "SEE_SOON" })); // triage
+
+    const blob = new Blob([new Uint8Array([1])], { type: "image/png" });
+    const result = await submitMediaSymptomCheck({ patientId: "p1", inputType: "PHOTO", blob });
+
+    // upload first, then 4 api calls: start, add, process, triage.
+    expect(mockUpload).toHaveBeenCalledTimes(1);
+    expect(mockApi).toHaveBeenCalledTimes(4);
+
+    // 1. start episode
+    expect(mockApi.mock.calls[0][0]).toBe("/patients/p1/episodes");
+    // 2. media submission carries the uploaded mediaUrl
+    expect(mockApi.mock.calls[1][0]).toBe("/episodes/ep5/submissions");
+    expect(JSON.parse((mockApi.mock.calls[1][1] as RequestInit).body as string)).toEqual({
+      inputType: "PHOTO",
+      mediaUrl: "/api/v1/media/m1",
+    });
+    // 3. process the submission synchronously
+    expect(mockApi.mock.calls[2][0]).toBe("/submissions/sub9/process");
+    expect((mockApi.mock.calls[2][1] as RequestInit).method).toBe("POST");
+    // 4. triage the episode
+    expect(mockApi.mock.calls[3][0]).toBe("/episodes/ep5/triage");
+
+    expect(result.status).toBe("AI_ANALYZED");
   });
 });

@@ -10,8 +10,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
-// Explicit, immediate processing trigger for a submission — used by an upload worker
-// or to process on demand without waiting for the poller. Authenticated; any clinic actor.
+// Explicit, immediate processing trigger for a submission — used by the patient intake flow
+// (upload → submission → process → triage) or to process on demand without waiting for the
+// poller. Ownership-gated in the service: a patient may process only their own submission.
 @RestController
 @RequiredArgsConstructor
 public class MediaProcessingController {
@@ -20,6 +21,6 @@ public class MediaProcessingController {
 
     @PostMapping("/api/v1/submissions/{submissionId}/process")
     public ResponseEntity<ProcessedSubmissionResponse> process(@PathVariable UUID submissionId) {
-        return ResponseEntity.ok(mediaProcessingService.process(submissionId));
+        return ResponseEntity.ok(mediaProcessingService.processForCaller(submissionId));
     }
 }

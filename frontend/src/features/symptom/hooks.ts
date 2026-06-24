@@ -1,5 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getEpisode, listEpisodes, submitTextSymptomCheck, type TextSymptomCheck } from "./api";
+import {
+  getEpisode,
+  listEpisodes,
+  submitTextSymptomCheck,
+  submitMediaSymptomCheck,
+  type TextSymptomCheck,
+  type MediaSymptomCheck,
+} from "./api";
 import type { Episode } from "./types";
 
 export const episodeKeys = {
@@ -29,14 +36,25 @@ export function useEpisode(episodeId: string | undefined) {
   });
 }
 
+function seedEpisode(qc: ReturnType<typeof useQueryClient>, episode: Episode) {
+  // Seed the detail cache so the result screen renders instantly, and refresh the list.
+  qc.setQueryData(episodeKeys.detail(episode.id), episode);
+  qc.invalidateQueries({ queryKey: episodeKeys.list(episode.patientId) });
+}
+
 export function useSubmitSymptomCheck() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: TextSymptomCheck) => submitTextSymptomCheck(input),
-    onSuccess: (episode: Episode) => {
-      // Seed the detail cache so the result screen renders instantly, and refresh the list.
-      qc.setQueryData(episodeKeys.detail(episode.id), episode);
-      qc.invalidateQueries({ queryKey: episodeKeys.list(episode.patientId) });
-    },
+    onSuccess: (episode: Episode) => seedEpisode(qc, episode),
+  });
+}
+
+// Photo/voice intake: upload → submission → synchronous process → triage, as one mutation.
+export function useSubmitMediaSymptomCheck() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: MediaSymptomCheck) => submitMediaSymptomCheck(input),
+    onSuccess: (episode: Episode) => seedEpisode(qc, episode),
   });
 }

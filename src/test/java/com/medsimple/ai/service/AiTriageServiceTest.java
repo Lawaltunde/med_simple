@@ -198,6 +198,30 @@ class AiTriageServiceTest {
                 ctx.symptoms().get(0).equals("Patient says chest hurts badly")));
     }
 
+    @Test
+    void triage_photoAnalysisUsedAsSymptomText() {
+        // A photo-only episode: the vision adapter's description must drive triage, or the
+        // episode would have no symptom text and fail. Regression for the collectSymptomTexts fix.
+        SymptomSubmission photo = SymptomSubmission.builder()
+                .id(UUID.randomUUID()).episode(episode).patient(patient)
+                .inputType(InputType.PHOTO).mediaUrl("/api/v1/media/abc")
+                .aiAnalysisResult("Erythematous rash on the left forearm")
+                .processingStatus(ProcessingStatus.COMPLETED)
+                .submittedAt(OffsetDateTime.now()).createdAt(OffsetDateTime.now()).build();
+
+        when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
+        when(submissionRepository.findByEpisodeIdOrderBySubmittedAtAsc(episodeId)).thenReturn(List.of(photo));
+        when(aiTriageDao.analyze(argThat(ctx -> ctx.symptoms().get(0).equals("Erythematous rash on the left forearm"))))
+                .thenReturn(new TriageResult(UrgencyLevel.SEE_SOON, "Localized rash."));
+        when(episodeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        aiTriageService.triageEpisode(episodeId);
+
+        verify(aiTriageDao).analyze(argThat(ctx ->
+                ctx.symptoms().size() == 1
+                        && ctx.symptoms().get(0).equals("Erythematous rash on the left forearm")));
+    }
+
     // ── AI care suggestion (gate tests) ────────────────────────────────────────
 
     private void stubTriage(TriageResult result) {

@@ -15,7 +15,10 @@ import com.medsimple.diagnostic.exception.InvalidRequisitionStateException;
 import com.medsimple.diagnostic.exception.RequisitionNotFoundException;
 import com.medsimple.diagnostic.exception.ResultNotFoundException;
 import com.medsimple.diagnostic.exception.ResultNotReleasedException;
+import com.medsimple.media.exception.MediaNotFoundException;
+import com.medsimple.media.exception.MediaTooLargeException;
 import com.medsimple.media.exception.SubmissionNotFoundException;
+import com.medsimple.media.exception.UnsupportedMediaTypeException;
 import com.medsimple.notification.exception.NotificationNotFoundException;
 import com.medsimple.referral.exception.InvalidReferralStateException;
 import com.medsimple.referral.exception.ReferralNotFoundException;
@@ -42,10 +45,24 @@ public class GlobalExceptionHandler {
 
     record ApiError(int status, String error, String message, Instant timestamp) {}
 
-    @ExceptionHandler({PatientNotFoundException.class, ClinicNotFoundException.class, EpisodeNotFoundException.class, CarePlanNotFoundException.class, PrescriptionNotFoundException.class, ReferralNotFoundException.class, RequisitionNotFoundException.class, ResultNotFoundException.class, NotificationNotFoundException.class, SubmissionNotFoundException.class, CareSuggestionNotFoundException.class, AppointmentNotFoundException.class})
+    @ExceptionHandler({PatientNotFoundException.class, ClinicNotFoundException.class, EpisodeNotFoundException.class, CarePlanNotFoundException.class, PrescriptionNotFoundException.class, ReferralNotFoundException.class, RequisitionNotFoundException.class, ResultNotFoundException.class, NotificationNotFoundException.class, SubmissionNotFoundException.class, MediaNotFoundException.class, CareSuggestionNotFoundException.class, AppointmentNotFoundException.class})
     public ResponseEntity<ApiError> handleNotFound(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ApiError(404, "NOT_FOUND", ex.getMessage(), Instant.now()));
+    }
+
+    // Upload rejected: content type not in the image/audio allow-list.
+    @ExceptionHandler(UnsupportedMediaTypeException.class)
+    public ResponseEntity<ApiError> handleUnsupportedMedia(UnsupportedMediaTypeException ex) {
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                .body(new ApiError(415, "UNSUPPORTED_MEDIA_TYPE", ex.getMessage(), Instant.now()));
+    }
+
+    // Upload rejected: file exceeds the configured maximum size.
+    @ExceptionHandler(MediaTooLargeException.class)
+    public ResponseEntity<ApiError> handleMediaTooLarge(MediaTooLargeException ex) {
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(new ApiError(413, "PAYLOAD_TOO_LARGE", ex.getMessage(), Instant.now()));
     }
 
     @ExceptionHandler({InvalidPrescriptionStateException.class, InvalidReferralStateException.class, InvalidRequisitionStateException.class, InvalidSuggestionStateException.class})
