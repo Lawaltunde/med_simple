@@ -3,7 +3,7 @@ import {
   addInterpretation,
   cancelRequisition,
   createRequisition,
-  getCarePlanRequisitions,
+  getEpisodeRequisitions,
   getResultForPhysician,
   listPatientResults,
   recordResult,
@@ -13,7 +13,7 @@ import {
 import type { RequisitionUrgency } from "./types";
 
 export const diagnosticKeys = {
-  forCarePlan: (carePlanId: string) => ["diagnostics", "requisitions", carePlanId] as const,
+  forEpisode: (episodeId: string) => ["diagnostics", "requisitions", episodeId] as const,
   result: (resultId: string) => ["diagnostics", "result", resultId] as const,
   patientResults: (patientId: string) => ["diagnostics", "patient-results", patientId] as const,
 };
@@ -22,11 +22,11 @@ const POLL_MS = 30_000;
 
 // ── Read ──────────────────────────────────────────────────────────────────────
 
-export function useCarePlanRequisitions(carePlanId: string | undefined) {
+export function useEpisodeRequisitions(episodeId: string | undefined) {
   return useQuery({
-    queryKey: diagnosticKeys.forCarePlan(carePlanId ?? ""),
-    queryFn: () => getCarePlanRequisitions(carePlanId!),
-    enabled: !!carePlanId,
+    queryKey: diagnosticKeys.forEpisode(episodeId ?? ""),
+    queryFn: () => getEpisodeRequisitions(episodeId!),
+    enabled: !!episodeId,
     refetchInterval: POLL_MS,
   });
 }
@@ -54,9 +54,9 @@ export function usePatientResults(patientId: string | undefined) {
 
 function useDiagnosticInvalidation() {
   const qc = useQueryClient();
-  return (opts: { carePlanId?: string; resultId?: string; patientId?: string }) => {
-    if (opts.carePlanId) {
-      qc.invalidateQueries({ queryKey: diagnosticKeys.forCarePlan(opts.carePlanId) });
+  return (opts: { episodeId?: string; resultId?: string; patientId?: string }) => {
+    if (opts.episodeId) {
+      qc.invalidateQueries({ queryKey: diagnosticKeys.forEpisode(opts.episodeId) });
     }
     if (opts.resultId) {
       qc.invalidateQueries({ queryKey: diagnosticKeys.result(opts.resultId) });
@@ -71,31 +71,29 @@ export function useCreateRequisition() {
   const invalidate = useDiagnosticInvalidation();
   return useMutation({
     mutationFn: (input: {
-      carePlanId: string;
+      episodeId: string;
       testType: string;
       testCodes?: string[];
       clinicalIndication?: string;
       urgency: RequisitionUrgency;
     }) => createRequisition(input),
-    onSuccess: (req) => invalidate({ carePlanId: req.carePlanId }),
+    onSuccess: (req) => invalidate({ episodeId: req.episodeId }),
   });
 }
 
 export function useSendRequisition() {
   const invalidate = useDiagnosticInvalidation();
   return useMutation({
-    mutationFn: ({ id }: { id: string; carePlanId: string }) =>
-      sendRequisition(id),
-    onSuccess: (_req, vars) => invalidate({ carePlanId: vars.carePlanId }),
+    mutationFn: ({ id }: { id: string; episodeId: string }) => sendRequisition(id),
+    onSuccess: (_req, vars) => invalidate({ episodeId: vars.episodeId }),
   });
 }
 
 export function useCancelRequisition() {
   const invalidate = useDiagnosticInvalidation();
   return useMutation({
-    mutationFn: ({ id }: { id: string; carePlanId: string }) =>
-      cancelRequisition(id),
-    onSuccess: (_req, vars) => invalidate({ carePlanId: vars.carePlanId }),
+    mutationFn: ({ id }: { id: string; episodeId: string }) => cancelRequisition(id),
+    onSuccess: (_req, vars) => invalidate({ episodeId: vars.episodeId }),
   });
 }
 
@@ -108,12 +106,11 @@ export function useRecordResult() {
       rawResultData,
     }: {
       requisitionId: string;
-      carePlanId: string;
+      episodeId: string;
       rawResultText: string;
       rawResultData?: string;
     }) => recordResult(requisitionId, { rawResultText, rawResultData }),
-    onSuccess: (result, vars) =>
-      invalidate({ carePlanId: vars.carePlanId, resultId: result.id }),
+    onSuccess: (result, vars) => invalidate({ episodeId: vars.episodeId, resultId: result.id }),
   });
 }
 
@@ -125,27 +122,19 @@ export function useAddInterpretation() {
       physicianInterpretation,
     }: {
       resultId: string;
-      carePlanId: string;
+      episodeId: string;
       physicianInterpretation: string;
     }) => addInterpretation(resultId, { physicianInterpretation }),
-    onSuccess: (result, vars) =>
-      invalidate({ carePlanId: vars.carePlanId, resultId: result.id }),
+    onSuccess: (result, vars) => invalidate({ episodeId: vars.episodeId, resultId: result.id }),
   });
 }
 
 export function useReleaseResult() {
   const invalidate = useDiagnosticInvalidation();
   return useMutation({
-    mutationFn: ({ resultId }: {
-      resultId: string;
-      carePlanId: string;
-      patientId: string;
-    }) => releaseResult(resultId),
+    mutationFn: ({ resultId }: { resultId: string; episodeId: string; patientId: string }) =>
+      releaseResult(resultId),
     onSuccess: (result, vars) =>
-      invalidate({
-        carePlanId: vars.carePlanId,
-        resultId: result.id,
-        patientId: vars.patientId,
-      }),
+      invalidate({ episodeId: vars.episodeId, resultId: result.id, patientId: vars.patientId }),
   });
 }

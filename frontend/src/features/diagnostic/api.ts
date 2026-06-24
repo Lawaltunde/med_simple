@@ -8,12 +8,13 @@ import type {
 
 // ── Requisitions ─────────────────────────────────────────────────────────────
 
-export function getCarePlanRequisitions(carePlanId: string): Promise<Requisition[]> {
-  return api<Requisition[]>(`/care-plans/${carePlanId}/requisitions`);
+// Requisitions hang off the episode now (a physician can order a work-up without a care plan).
+export function getEpisodeRequisitions(episodeId: string): Promise<Requisition[]> {
+  return api<Requisition[]>(`/episodes/${episodeId}/requisitions`);
 }
 
 export function createRequisition(input: {
-  carePlanId: string;
+  episodeId: string;
   testType: string;
   testCodes?: string[];
   clinicalIndication?: string;
