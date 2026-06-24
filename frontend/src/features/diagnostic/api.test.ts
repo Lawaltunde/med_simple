@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { api } from "@/lib/api";
 import {
-  getCarePlanRequisitions,
+  getEpisodeRequisitions,
   createRequisition,
   sendRequisition,
   cancelRequisition,
@@ -20,24 +20,24 @@ describe("diagnostic api", () => {
 
   // ── Requisitions ────────────────────────────────────────────────────────────
 
-  it("getCarePlanRequisitions calls the care-plan requisitions path", async () => {
-    await getCarePlanRequisitions("cp-1");
-    expect(mockApi.mock.calls[0][0]).toBe("/care-plans/cp-1/requisitions");
+  it("getEpisodeRequisitions calls the episode requisitions path", async () => {
+    await getEpisodeRequisitions("ep-1");
+    expect(mockApi.mock.calls[0][0]).toBe("/episodes/ep-1/requisitions");
   });
 
   it("createRequisition POSTs all required fields", async () => {
-    await createRequisition({ carePlanId: "cp-1", testType: "CBC", urgency: "ROUTINE" });
+    await createRequisition({ episodeId: "ep-1", testType: "CBC", urgency: "ROUTINE" });
     expect(mockApi.mock.calls[0][0]).toBe("/requisitions");
     expect((mockApi.mock.calls[0][1] as RequestInit).method).toBe("POST");
     const body = bodyOf(0);
-    expect(body.carePlanId).toBe("cp-1");
+    expect(body.episodeId).toBe("ep-1");
     expect(body.testType).toBe("CBC");
     expect(body.urgency).toBe("ROUTINE");
   });
 
   it("createRequisition includes optional fields when provided", async () => {
     await createRequisition({
-      carePlanId: "cp-1",
+      episodeId: "ep-1",
       testType: "CBC",
       urgency: "URGENT",
       clinicalIndication: "Anaemia screen",

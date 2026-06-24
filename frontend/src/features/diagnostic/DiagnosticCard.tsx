@@ -17,7 +17,7 @@ import type { Requisition, PhysicianResult, RequisitionUrgency } from "./types";
 import { RequisitionStatusBadge, UrgencyBadge } from "./display";
 import { formatDateTime } from "@/features/symptom/display";
 import {
-  useCarePlanRequisitions,
+  useEpisodeRequisitions,
   useCreateRequisition,
   useSendRequisition,
   useCancelRequisition,
@@ -32,11 +32,11 @@ import {
 
 function ResultPanel({
   requisition,
-  carePlanId,
+  episodeId,
   patientId,
 }: {
   requisition: Requisition;
-  carePlanId: string;
+  episodeId: string;
   patientId: string;
 }) {
   // Result ID is not on the requisition DTO — track locally after recording.
@@ -88,7 +88,7 @@ function ResultPanel({
           disabled={recordResult.isPending || rawText.trim().length < 3}
           onClick={() =>
             recordResult.mutate(
-              { requisitionId: requisition.id, carePlanId, rawResultText: rawText.trim() },
+              { requisitionId: requisition.id, episodeId, rawResultText: rawText.trim() },
               { onSuccess: (r) => setLocalResult(r) }
             )
           }
@@ -150,7 +150,7 @@ function ResultPanel({
                 disabled={addInterpretation.isPending}
                 onClick={() =>
                   addInterpretation.mutate(
-                    { resultId: activeResult.id, carePlanId, physicianInterpretation: interpretation.trim() },
+                    { resultId: activeResult.id, episodeId, physicianInterpretation: interpretation.trim() },
                     { onSuccess: (r) => setLocalResult(r) }
                   )
                 }
@@ -168,7 +168,7 @@ function ResultPanel({
               disabled={releaseResult.isPending}
               onClick={() =>
                 releaseResult.mutate(
-                  { resultId: activeResult.id, carePlanId, patientId },
+                  { resultId: activeResult.id, episodeId, patientId },
                   { onSuccess: (r) => setLocalResult(r) }
                 )
               }
@@ -192,11 +192,11 @@ function ResultPanel({
 
 function RequisitionRow({
   req,
-  carePlanId,
+  episodeId,
   patientId,
 }: {
   req: Requisition;
-  carePlanId: string;
+  episodeId: string;
   patientId: string;
 }) {
   const send = useSendRequisition();
@@ -261,7 +261,7 @@ function RequisitionRow({
                 disabled={send.isPending}
                 onClick={(e) => {
                   e.stopPropagation();
-                  send.mutate({ id: req.id, carePlanId });
+                  send.mutate({ id: req.id, episodeId });
                 }}
               >
                 {send.isPending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
@@ -275,7 +275,7 @@ function RequisitionRow({
                 disabled={cancel.isPending}
                 onClick={(e) => {
                   e.stopPropagation();
-                  cancel.mutate({ id: req.id, carePlanId });
+                  cancel.mutate({ id: req.id, episodeId });
                 }}
               >
                 {cancel.isPending ? <Loader2 className="size-4 animate-spin" /> : <XCircle className="size-4" />}
@@ -286,7 +286,7 @@ function RequisitionRow({
 
           {/* Result sub-panel — available once the lab has the requisition */}
           {showResultPanel && (
-            <ResultPanel requisition={req} carePlanId={carePlanId} patientId={patientId} />
+            <ResultPanel requisition={req} episodeId={episodeId} patientId={patientId} />
           )}
         </div>
       )}
@@ -302,7 +302,7 @@ const URGENCY_OPTIONS: { value: RequisitionUrgency; label: string }[] = [
   { value: "STAT", label: "STAT" },
 ];
 
-function CreateRequisitionForm({ carePlanId }: { carePlanId: string }) {
+function CreateRequisitionForm({ episodeId }: { episodeId: string }) {
   const [testType, setTestType] = useState("");
   const [clinicalIndication, setClinicalIndication] = useState("");
   const [urgency, setUrgency] = useState<RequisitionUrgency>("ROUTINE");
@@ -320,7 +320,7 @@ function CreateRequisitionForm({ carePlanId }: { carePlanId: string }) {
   function submit() {
     if (testType.trim().length < 2) return;
     create.mutate(
-      { carePlanId, testType: testType.trim(), clinicalIndication: clinicalIndication.trim() || undefined, urgency },
+      { episodeId, testType: testType.trim(), clinicalIndication: clinicalIndication.trim() || undefined, urgency },
       {
         onSuccess: () => {
           setTestType("");
@@ -418,25 +418,11 @@ export function DiagnosticCard({ episode }: { episode: Episode; episodeId: strin
   return <DiagnosticCardInner episode={episode} />;
 }
 
-// The Episode type doesn't carry a carePlanId in the current scaffold. The card accepts
-// an optional extension — EpisodeReview can attach it once care plans are loaded.
-// Without it, the card renders a prompt to create a care plan first.
-function DiagnosticCardInner({ episode }: { episode: Episode & { carePlanId?: string } }) {
-  const carePlanId: string | undefined = (episode as Episode & { carePlanId?: string }).carePlanId;
+// Requisitions hang off the episode, so a physician can order a work-up without a care plan.
+function DiagnosticCardInner({ episode }: { episode: Episode }) {
+  const episodeId = episode.id;
 
-  const { data: requisitions, isLoading } = useCarePlanRequisitions(carePlanId);
-
-  if (!carePlanId) {
-    // No care plan yet — requisitions can only be ordered once a plan exists.
-    return (
-      <section className="rounded-2xl border border-line bg-white p-6">
-        <h3 className="flex items-center gap-2 font-bold text-brand-900">
-          <FlaskConical className="size-4 text-brand-600" /> Diagnostics
-        </h3>
-        <p className="mt-2 text-sm text-muted">Create a care plan first to order diagnostic tests.</p>
-      </section>
-    );
-  }
+  const { data: requisitions, isLoading } = useEpisodeRequisitions(episodeId);
 
   return (
     <section className="rounded-2xl border border-line bg-white p-6">
@@ -455,7 +441,7 @@ function DiagnosticCardInner({ episode }: { episode: Episode & { carePlanId?: st
             <RequisitionRow
               key={req.id}
               req={req}
-              carePlanId={carePlanId}
+              episodeId={episodeId}
               patientId={episode.patientId}
             />
           ))}
@@ -465,7 +451,7 @@ function DiagnosticCardInner({ episode }: { episode: Episode & { carePlanId?: st
       )}
 
       <div className="mt-4">
-        <CreateRequisitionForm carePlanId={carePlanId} />
+        <CreateRequisitionForm episodeId={episodeId} />
       </div>
     </section>
   );

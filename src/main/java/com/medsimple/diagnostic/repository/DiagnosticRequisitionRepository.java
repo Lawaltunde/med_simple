@@ -12,5 +12,7 @@ public interface DiagnosticRequisitionRepository extends JpaRepository<Diagnosti
 
     List<DiagnosticRequisition> findByCarePlanIdOrderByCreatedAtDesc(UUID carePlanId);
 
+    List<DiagnosticRequisition> findByEpisodeIdOrderByCreatedAtDesc(UUID episodeId);
+
     List<DiagnosticRequisition> findByPatientIdOrderByCreatedAtDesc(UUID patientId);
 }
