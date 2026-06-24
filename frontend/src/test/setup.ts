@@ -15,6 +15,11 @@ if (typeof URL.revokeObjectURL !== "function") {
   URL.revokeObjectURL = () => {};
 }
 
+// jsdom does not implement scrollIntoView; the chat auto-scrolls to the latest message.
+if (typeof Element.prototype.scrollIntoView !== "function") {
+  Element.prototype.scrollIntoView = () => {};
+}
+
 afterEach(() => {
   cleanup();
 });
