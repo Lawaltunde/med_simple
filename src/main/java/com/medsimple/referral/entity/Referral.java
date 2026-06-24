@@ -26,7 +26,12 @@ public class Referral {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "care_plan_id", nullable = false)
+    @JoinColumn(name = "episode_id", nullable = false)
+    private com.medsimple.symptom.entity.SymptomEpisode episode;
+
+    // Optional link: a referral can be made before any care plan exists.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "care_plan_id")
     private CarePlan carePlan;
 
     @ManyToOne(fetch = FetchType.LAZY)

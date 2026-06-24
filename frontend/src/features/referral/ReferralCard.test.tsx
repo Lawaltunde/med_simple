@@ -28,13 +28,13 @@ vi.mock("@/features/careplan/api", () => ({
 
 // ── Referral network layer ─────────────────────────────────────────────────────
 
-const getCarePlanReferralsMock = vi.fn();
+const getEpisodeReferralsMock = vi.fn();
 const createReferralMock = vi.fn();
 const confirmSpecialtyMock = vi.fn();
 const submitReferralMock = vi.fn();
 
 vi.mock("@/features/referral/api", () => ({
-  getCarePlanReferrals: (...a: unknown[]) => getCarePlanReferralsMock(...a),
+  getEpisodeReferrals: (...a: unknown[]) => getEpisodeReferralsMock(...a),
   createReferral: (...a: unknown[]) => createReferralMock(...a),
   confirmSpecialty: (...a: unknown[]) => confirmSpecialtyMock(...a),
   submitReferral: (...a: unknown[]) => submitReferralMock(...a),
@@ -82,7 +82,8 @@ function carePlan(over: Partial<CarePlan> = {}): CarePlan {
 function referral(over: Partial<Referral> = {}): Referral {
   return {
     id: "ref-1",
-    carePlanId: "cp-1",
+    episodeId: "ep-1",
+    carePlanId: null,
     patientId: "pat-1",
     referringPhysicianId: "doc-1",
     aiSuggestedSpecialty: "Cardiology",
@@ -116,7 +117,7 @@ describe("ReferralCard", () => {
   beforeEach(() => {
     mockRole.mockReturnValue("PHYSICIAN");
     listCarePlansMock.mockReset();
-    getCarePlanReferralsMock.mockReset();
+    getEpisodeReferralsMock.mockReset();
     createReferralMock.mockReset();
     confirmSpecialtyMock.mockReset();
     submitReferralMock.mockReset();
@@ -125,24 +126,21 @@ describe("ReferralCard", () => {
   it("renders nothing for a non-physician user", async () => {
     mockRole.mockReturnValue("PATIENT");
     listCarePlansMock.mockResolvedValue([carePlan()]);
-    getCarePlanReferralsMock.mockResolvedValue([]);
+    getEpisodeReferralsMock.mockResolvedValue([]);
     const { container } = renderCard();
     // Nothing rendered — null output
     expect(container.firstChild).toBeNull();
   });
 
-  it("renders nothing when there is no care plan for the episode", async () => {
-    // Care plan belongs to a different episode
-    listCarePlansMock.mockResolvedValue([carePlan({ episodeId: "ep-other" })]);
-    const { container } = renderCard();
-    // null until query resolves, then still null
-    await waitFor(() => expect(listCarePlansMock).toHaveBeenCalled());
-    expect(container.firstChild).toBeNull();
+  it("renders the referral form without needing a care plan", async () => {
+    getEpisodeReferralsMock.mockResolvedValue([]);
+    renderCard();
+    expect(await screen.findByText(/specialist referral/i)).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /create referral/i })).toBeInTheDocument();
   });
 
   it("shows create form when there are no referrals yet", async () => {
-    listCarePlansMock.mockResolvedValue([carePlan()]);
-    getCarePlanReferralsMock.mockResolvedValue([]);
+    getEpisodeReferralsMock.mockResolvedValue([]);
     renderCard();
     expect(await screen.findByText(/specialist referral/i)).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: /create referral/i })).toBeInTheDocument();
@@ -150,7 +148,7 @@ describe("ReferralCard", () => {
 
   it("disables create button when summary is too short", async () => {
     listCarePlansMock.mockResolvedValue([carePlan()]);
-    getCarePlanReferralsMock.mockResolvedValue([]);
+    getEpisodeReferralsMock.mockResolvedValue([]);
     renderCard();
     const btn = await screen.findByRole("button", { name: /create referral/i });
     expect(btn).toBeDisabled();
@@ -158,7 +156,7 @@ describe("ReferralCard", () => {
 
   it("calls createReferral with correct payload on submit", async () => {
     listCarePlansMock.mockResolvedValue([carePlan()]);
-    getCarePlanReferralsMock.mockResolvedValue([]);
+    getEpisodeReferralsMock.mockResolvedValue([]);
     createReferralMock.mockResolvedValue(referral());
 
     const user = userEvent.setup();
@@ -173,7 +171,7 @@ describe("ReferralCard", () => {
 
     await waitFor(() =>
       expect(createReferralMock).toHaveBeenCalledWith({
-        carePlanId: "cp-1",
+        episodeId: "ep-1",
         clinicalSummary: "Patient with worsening chest pain",
         urgency: "ROUTINE",
       })
@@ -182,7 +180,7 @@ describe("ReferralCard", () => {
 
   it("shows AI suggestion and confirm button for a DRAFT referral", async () => {
     listCarePlansMock.mockResolvedValue([carePlan()]);
-    getCarePlanReferralsMock.mockResolvedValue([referral()]);
+    getEpisodeReferralsMock.mockResolvedValue([referral()]);
 
     renderCard();
 
@@ -192,7 +190,7 @@ describe("ReferralCard", () => {
 
   it("calls confirmSpecialty when physician accepts the AI suggestion", async () => {
     listCarePlansMock.mockResolvedValue([carePlan()]);
-    getCarePlanReferralsMock.mockResolvedValue([referral({ aiSuggestedSpecialty: "Cardiology" })]);
+    getEpisodeReferralsMock.mockResolvedValue([referral({ aiSuggestedSpecialty: "Cardiology" })]);
     confirmSpecialtyMock.mockResolvedValue(referral({ confirmedSpecialty: "Cardiology" }));
 
     const user = userEvent.setup();
@@ -209,7 +207,7 @@ describe("ReferralCard", () => {
   it("submit button is disabled until specialty is confirmed", async () => {
     listCarePlansMock.mockResolvedValue([carePlan()]);
     // confirmedSpecialty is null → submit must be disabled
-    getCarePlanReferralsMock.mockResolvedValue([referral({ confirmedSpecialty: null })]);
+    getEpisodeReferralsMock.mockResolvedValue([referral({ confirmedSpecialty: null })]);
 
     renderCard();
 
@@ -219,7 +217,7 @@ describe("ReferralCard", () => {
 
   it("calls submitReferral once the specialty is confirmed", async () => {
     listCarePlansMock.mockResolvedValue([carePlan()]);
-    getCarePlanReferralsMock.mockResolvedValue([
+    getEpisodeReferralsMock.mockResolvedValue([
       referral({ confirmedSpecialty: "Cardiology" }),
     ]);
     submitReferralMock.mockResolvedValue(
@@ -238,7 +236,7 @@ describe("ReferralCard", () => {
 
   it("shows delivery method and submitted status after submission", async () => {
     listCarePlansMock.mockResolvedValue([carePlan()]);
-    getCarePlanReferralsMock.mockResolvedValue([
+    getEpisodeReferralsMock.mockResolvedValue([
       referral({
         confirmedSpecialty: "Cardiology",
         status: "SUBMITTED",
