@@ -1,0 +1,35 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Supabase profile — DB on Supabase Postgres + media on Supabase Storage (S3 API).
+#
+# Setup:
+#   1. cp application-supabase.properties.example application-supabase.properties
+#   2. Fill the placeholders below from the Supabase dashboard.
+#   3. Run with BOTH profiles so your local secrets (OpenAI key, JWT) still load and
+#      Supabase overrides the datasource + storage:
+#        ./mvnw spring-boot:run -Dspring-boot.run.profiles=local,supabase
+#
+# The real file (application-supabase.properties) is gitignored — never commit it.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Database ──────────────────────────────────────────────────
+# Use the SESSION POOLER connection string (Dashboard → Project Settings → Database →
+# Connection string → "Session pooler"). It is IPv4-friendly and runs on port 5432.
+# Do NOT use the Transaction pooler (port 6543): Flyway needs session-level locks and will
+# fail/hang there. Direct connection also works if your network has IPv6.
+spring.datasource.url=jdbc:postgresql://aws-0-<region>.pooler.supabase.com:5432/postgres
+spring.datasource.username=postgres.<project-ref>
+spring.datasource.password=<your-database-password>
+
+# Flyway owns the schema (V1..V12). pgcrypto/gen_random_uuid are available on Supabase by default.
+spring.flyway.enabled=true
+spring.jpa.hibernate.ddl-auto=none
+
+# ── Media storage (Supabase Storage, S3 protocol) ────────────
+# Dashboard → Storage → create a PRIVATE bucket named "medsimple-media".
+# S3 keys: Dashboard → Project Settings → Storage → S3 access keys → "New access key".
+media.storage.adapter=s3
+media.storage.s3.endpoint=https://<project-ref>.storage.supabase.co/storage/v1/s3
+media.storage.s3.region=<project-region>
+media.storage.s3.bucket=medsimple-media
+media.storage.s3.access-key=<s3-access-key-id>
+media.storage.s3.secret-key=<s3-secret-access-key>

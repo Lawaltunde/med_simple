@@ -42,6 +42,10 @@ CLAUDE.md
 application-local.properties
 src/main/resources/application-local.properties
 
+### Supabase profile — DB connection string + S3 storage keys, never commit (use the .example)
+application-supabase.properties
+src/main/resources/application-supabase.properties
+
 ### Testcontainers local overrides — never commit machine-specific docker.host paths
 testcontainers.properties
 src/test/resources/testcontainers.properties
