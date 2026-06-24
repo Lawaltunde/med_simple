@@ -34,6 +34,7 @@ class MediaProcessingServiceTest {
     @Mock VoiceTranscriptionDao voiceTranscriptionDao;
     @Mock PhotoAnalysisDao photoAnalysisDao;
     @Mock AuditService auditService;
+    @Mock com.medsimple.auth.security.AccessGuard accessGuard;
 
     @InjectMocks MediaProcessingService service;
 
@@ -131,6 +132,33 @@ class MediaProcessingServiceTest {
         when(submissionRepository.findById(id)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.process(id)).isInstanceOf(SubmissionNotFoundException.class);
+    }
+
+    // ── caller-driven processing (IDOR gate) ──────────────────────────────────────
+
+    @Test
+    void processForCaller_ownSubmission_gatesThenProcesses() {
+        SymptomSubmission s = submission(InputType.PHOTO, ProcessingStatus.PENDING, "/api/v1/media/x");
+        when(submissionRepository.findById(s.getId())).thenReturn(Optional.of(s));
+        when(photoAnalysisDao.analyze("/api/v1/media/x")).thenReturn("Rash on forearm");
+        when(submissionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        ProcessedSubmissionResponse response = service.processForCaller(s.getId());
+
+        verify(accessGuard).requirePatientSelfOrStaff(patient.getId());
+        assertThat(response.processingStatus()).isEqualTo(ProcessingStatus.COMPLETED);
+    }
+
+    @Test
+    void processForCaller_othersSubmission_denied() {
+        SymptomSubmission s = submission(InputType.PHOTO, ProcessingStatus.PENDING, "/api/v1/media/x");
+        when(submissionRepository.findById(s.getId())).thenReturn(Optional.of(s));
+        doThrow(new org.springframework.security.access.AccessDeniedException("nope"))
+                .when(accessGuard).requirePatientSelfOrStaff(patient.getId());
+
+        assertThatThrownBy(() -> service.processForCaller(s.getId()))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verifyNoInteractions(photoAnalysisDao, voiceTranscriptionDao);
     }
 
     // ── poller source ───────────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 package com.medsimple.media.service;
 
 import com.medsimple.audit.service.AuditService;
+import com.medsimple.auth.security.AccessGuard;
 import com.medsimple.media.dao.PhotoAnalysisDao;
 import com.medsimple.media.dao.VoiceTranscriptionDao;
 import com.medsimple.media.dto.ProcessedSubmissionResponse;
@@ -33,12 +34,28 @@ public class MediaProcessingService {
     private final VoiceTranscriptionDao voiceTranscriptionDao;
     private final PhotoAnalysisDao photoAnalysisDao;
     private final AuditService auditService;
+    private final AccessGuard accessGuard;
 
     @Transactional(readOnly = true)
     public List<UUID> findPendingSubmissionIds() {
         return submissionRepository
                 .findByProcessingStatusAndInputTypeIn(ProcessingStatus.PENDING, MEDIA_TYPES)
                 .stream().map(SymptomSubmission::getId).toList();
+    }
+
+    /**
+     * Caller-driven processing (the HTTP /process endpoint). Ownership-gated: a patient may
+     * only process their own submission, staff may process any. This guards against an IDOR —
+     * the response carries the transcription / analysis, so it must never be reachable for
+     * another patient's submission. The background poller uses {@link #process} directly, which
+     * runs without a security context.
+     */
+    @Transactional
+    public ProcessedSubmissionResponse processForCaller(UUID submissionId) {
+        SymptomSubmission submission = submissionRepository.findById(submissionId)
+                .orElseThrow(() -> new SubmissionNotFoundException(submissionId));
+        accessGuard.requirePatientSelfOrStaff(submission.getPatient().getId());
+        return process(submissionId);
     }
 
     @Transactional

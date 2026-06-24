@@ -1,20 +1,23 @@
 package com.medsimple.media.dao;
 
+import com.medsimple.media.storage.MediaContent;
+import com.medsimple.media.storage.MediaStorageDao;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Primary;
-import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Component;
+import org.springframework.util.MimeType;
 import org.springframework.util.MimeTypeUtils;
-
-import java.net.URI;
 
 /**
  * GPT-4o vision analysis of a patient-submitted photo via Spring AI ChatClient.
- * The image URL is passed as media to the model. PHI: the image stays within the
- * platform's storage; only its URL is handed to the model provider.
  * Active when ai.media.adapter=openai.
+ *
+ * PHI: the mediaUrl is an auth-gated in-platform path (/api/v1/media/{id}), not externally
+ * fetchable. The adapter resolves it to the stored bytes via {@link MediaStorageDao} and
+ * hands ONLY the image bytes to the model — no patient id, no URL, no submission context.
+ * The image content itself is the sole thing that leaves the platform, by design.
  */
 @Slf4j
 @Primary
@@ -30,21 +33,25 @@ public class OpenAiPhotoAnalysisAdapter implements PhotoAnalysisDao {
             """;
 
     private final ChatClient chatClient;
+    private final MediaStorageDao mediaStorage;
 
-    public OpenAiPhotoAnalysisAdapter(ChatClient.Builder chatClientBuilder) {
+    public OpenAiPhotoAnalysisAdapter(ChatClient.Builder chatClientBuilder, MediaStorageDao mediaStorage) {
         this.chatClient = chatClientBuilder.build();
+        this.mediaStorage = mediaStorage;
     }
 
     @Override
     public String analyze(String mediaUrl) {
         try {
-            UrlResource image = new UrlResource(URI.create(mediaUrl));
+            MediaContent media = mediaStorage.resolve(mediaUrl);
+            MimeType mimeType = MimeTypeUtils.parseMimeType(media.contentType());
             return chatClient.prompt()
-                    .user(u -> u.text(PROMPT).media(MimeTypeUtils.IMAGE_JPEG, image))
+                    .user(u -> u.text(PROMPT).media(mimeType, media.resource()))
                     .call()
                     .content();
         } catch (Exception e) {
-            log.error("OpenAI photo analysis failed for {}; falling back to clinician review note", mediaUrl, e);
+            // Log the failure, not the media or any identifier.
+            log.error("OpenAI photo analysis failed; falling back to clinician review note", e);
             return "[Photo received. Automatic analysis failed; a clinician will review the image.]";
         }
     }
