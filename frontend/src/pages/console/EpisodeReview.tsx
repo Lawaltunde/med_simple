@@ -20,6 +20,7 @@ import { PrescriptionCard } from "@/features/prescription/PrescriptionCard";
 import { DiagnosticCard } from "@/features/diagnostic/DiagnosticCard";
 import { ReferralCard } from "@/features/referral/ReferralCard";
 import { BookAppointmentCard } from "@/features/appointment/BookAppointmentCard";
+import { AuthedMedia } from "@/features/media/AuthedMedia";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api";
@@ -80,9 +81,16 @@ export function EpisodeReview() {
             <h3 className="font-bold text-brand-900">What the patient reported</h3>
             <ul className="mt-3 space-y-3">
               {episode.submissions.map((s) => (
-                <li key={s.id} className="text-[0.95rem] text-ink">
-                  {s.textContent || s.transcription || s.aiAnalysisResult || "(media submission)"}
-                  <span className="ml-2 text-xs text-muted">{formatDateTime(s.submittedAt)}</span>
+                <li key={s.id} className="space-y-2 text-[0.95rem] text-ink">
+                  <div>
+                    {s.textContent || s.transcription || s.aiAnalysisResult || "(media submission)"}
+                    <span className="ml-2 text-xs text-muted">{formatDateTime(s.submittedAt)}</span>
+                  </div>
+                  {/* The actual photo / voice note, not just the AI's text reading of it. The GET is
+                      ownership-gated and staff-allowed, so AuthedMedia fetches it with the token. */}
+                  {s.mediaUrl && (s.inputType === "PHOTO" || s.inputType === "VOICE") && (
+                    <AuthedMedia mediaUrl={s.mediaUrl} inputType={s.inputType} />
+                  )}
                 </li>
               ))}
             </ul>
