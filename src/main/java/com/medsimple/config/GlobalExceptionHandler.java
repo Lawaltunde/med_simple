@@ -8,6 +8,7 @@ import com.medsimple.careplan.exception.CarePlanNotFoundException;
 import com.medsimple.careplan.exception.CareSuggestionNotFoundException;
 import com.medsimple.careplan.exception.InvalidSuggestionStateException;
 import com.medsimple.clinic.exception.ClinicNotFoundException;
+import com.medsimple.clinic.exception.InvalidPhysicianCredentialException;
 import com.medsimple.clinic.exception.StaffAlreadyExistsException;
 import com.medsimple.prescription.exception.InvalidPrescriptionStateException;
 import com.medsimple.prescription.exception.PrescriptionNotFoundException;
@@ -110,6 +111,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleInvalidHealthCard(InvalidHealthCardException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ApiError(400, "INVALID_HEALTH_CARD", ex.getMessage(), Instant.now()));
+    }
+
+    @ExceptionHandler(InvalidPhysicianCredentialException.class)
+    public ResponseEntity<ApiError> handleInvalidCredential(InvalidPhysicianCredentialException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new ApiError(400, "INVALID_PHYSICIAN_CREDENTIAL", ex.getMessage(), Instant.now()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

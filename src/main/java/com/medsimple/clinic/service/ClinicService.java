@@ -31,6 +31,8 @@ public class ClinicService {
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
     private final AccessGuard accessGuard;
+    private final com.medsimple.clinic.credential.PhysicianCredentialValidator credentialValidator;
+    private final com.medsimple.clinic.credential.PhysicianCredentialVerificationDao credentialVerifier;
 
     /**
      * A CLINIC_ADMIN may manage only their own clinic; a SUPER_ADMIN may manage any. The
@@ -116,6 +118,10 @@ public class ClinicService {
             throw new EmailAlreadyInUseException(request.email());
         }
 
+        // Physicians must present valid College credentials; checked before any row is written.
+        credentialValidator.validateForOnboarding(request.role(), request.college(),
+                request.registrationNumber(), request.licenseProvince());
+
         UserRole userRole = switch (request.role()) {
             case PHYSICIAN -> UserRole.PHYSICIAN;
             case NURSE -> UserRole.NURSE;
@@ -139,11 +145,43 @@ public class ClinicService {
                 .role(request.role())
                 .licenseNumber(request.licenseNumber())
                 .specialization(request.specialization())
+                .college(request.college())
+                .registrationNumber(request.registrationNumber())
+                .licenseProvince(request.licenseProvince())
+                .billingNumber(request.billingNumber())
+                // New staff start UNVERIFIED (entity default); an admin runs verification next.
                 .build();
         ClinicStaff savedStaff = staffRepository.save(staff);
 
         auditService.log(savedUser.getId(), "STAFF_ADDED", "clinic_staff", savedStaff.getId(), ipAddress);
         return toStaffResponse(savedStaff);
+    }
+
+    /**
+     * Run College-registration verification for a staff member and record the outcome. Routed
+     * through the {@link com.medsimple.clinic.credential.PhysicianCredentialVerificationDao} seam:
+     * manual-review by default, the automated College registry when that adapter is active.
+     */
+    @Transactional
+    public StaffResponse verifyStaff(UUID clinicId, UUID staffId, String ipAddress) {
+        requireClinicScope(clinicId);
+        ClinicStaff staff = staffRepository.findByIdAndClinicId(staffId, clinicId)
+                .orElseThrow(() -> new ClinicNotFoundException(clinicId));
+
+        var credential = new com.medsimple.clinic.credential.PhysicianCredential(
+                staff.getCollege(), staff.getRegistrationNumber(), staff.getLicenseProvince(),
+                staff.getUser().getFirstName(), staff.getUser().getLastName());
+        var result = credentialVerifier.verify(credential);
+
+        staff.setVerificationStatus(result.status());
+        staff.setVerificationSource(result.source());
+        staff.setVerifiedAt(result.status() == VerificationStatus.VERIFIED
+                ? java.time.OffsetDateTime.now() : null);
+        ClinicStaff saved = staffRepository.save(staff);
+
+        auditService.log(accessGuard.currentUserId(), "STAFF_CREDENTIAL_VERIFIED",
+                "clinic_staff", saved.getId(), ipAddress);
+        return toStaffResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -208,6 +246,8 @@ public class ClinicService {
                 s.getUser().getFirstName(), s.getUser().getLastName(),
                 s.getUser().getEmail(), s.getRole(),
                 s.getLicenseNumber(), s.getSpecialization(),
+                s.getCollege(), s.getRegistrationNumber(), s.getLicenseProvince(), s.getBillingNumber(),
+                s.getVerificationStatus(), s.getVerificationSource(), s.getVerifiedAt(),
                 s.isActive(), s.getCreatedAt());
     }
 

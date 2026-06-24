@@ -37,6 +37,8 @@ class ClinicServiceTest {
     @Mock PasswordEncoder passwordEncoder;
     @Mock AuditService auditService;
     @Mock AccessGuard accessGuard;
+    @Mock com.medsimple.clinic.credential.PhysicianCredentialValidator credentialValidator;
+    @Mock com.medsimple.clinic.credential.PhysicianCredentialVerificationDao credentialVerifier;
 
     @InjectMocks ClinicService clinicService;
 
@@ -143,7 +145,8 @@ class ClinicServiceTest {
     void addStaff_createsUserAndStaff() {
         AddStaffRequest request = new AddStaffRequest(
                 "dr.smith@clinic.ca", "password123", "John", "Smith",
-                "416-555-0200", StaffRole.PHYSICIAN, "ON-12345", "General Practice");
+                "416-555-0200", StaffRole.PHYSICIAN, "ON-12345", "General Practice",
+                "CPSO", "67890", "ON", "BILL-001");
 
         User savedUser = User.builder()
                 .id(UUID.randomUUID())
@@ -188,7 +191,8 @@ class ClinicServiceTest {
 
         AddStaffRequest request = new AddStaffRequest(
                 "dr.smith@clinic.ca", "password123", "John", "Smith",
-                "416-555-0200", StaffRole.PHYSICIAN, "ON-12345", "General Practice");
+                "416-555-0200", StaffRole.PHYSICIAN, "ON-12345", "General Practice",
+                "CPSO", "67890", "ON", "BILL-001");
 
         assertThatThrownBy(() -> clinicService.addStaff(clinicId, request, "127.0.0.1"))
                 .isInstanceOf(AccessDeniedException.class)
@@ -197,6 +201,34 @@ class ClinicServiceTest {
         // Nothing was created.
         verify(staffRepository, never()).save(any());
         verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void verifyStaff_recordsOutcomeFromVerifierAndAudits() {
+        UUID staffId = UUID.randomUUID();
+        User docUser = User.builder().id(UUID.randomUUID())
+                .firstName("John").lastName("Smith").email("dr.smith@clinic.ca")
+                .role(UserRole.PHYSICIAN).createdAt(OffsetDateTime.now()).build();
+        ClinicStaff staff = ClinicStaff.builder()
+                .id(staffId).clinic(sampleClinic).user(docUser).role(StaffRole.PHYSICIAN)
+                .college("CPSO").registrationNumber("67890").licenseProvince("ON")
+                .verificationStatus(VerificationStatus.UNVERIFIED)
+                .active(true).createdAt(OffsetDateTime.now()).build();
+
+        when(accessGuard.currentUserId()).thenReturn(UUID.randomUUID());
+        when(staffRepository.findByIdAndClinicId(staffId, clinicId)).thenReturn(Optional.of(staff));
+        when(staffRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(credentialVerifier.verify(any())).thenReturn(
+                new com.medsimple.clinic.credential.VerificationResult(
+                        VerificationStatus.VERIFIED, "MANUAL_REVIEW", "ok"));
+
+        StaffResponse res = clinicService.verifyStaff(clinicId, staffId, "1.2.3.4");
+
+        assertThat(res.verificationStatus()).isEqualTo(VerificationStatus.VERIFIED);
+        assertThat(res.verificationSource()).isEqualTo("MANUAL_REVIEW");
+        assertThat(res.verifiedAt()).isNotNull();
+        verify(auditService).log(any(), eq("STAFF_CREDENTIAL_VERIFIED"), eq("clinic_staff"),
+                eq(staffId), eq("1.2.3.4"));
     }
 
     // ── setCapability ─────────────────────────────────────────────────────────
