@@ -130,7 +130,11 @@ public class PrescriptionService {
         }
 
         // clinic_capabilities decides the channel: PrescribeIT if enabled, else PDF fallback.
-        UUID clinicId = rx.getCarePlan().getClinic().getId();
+        // Orders hang off the episode (care plan optional since the re-parent), so the clinic comes
+        // from the episode's assigned clinic, falling back to the care plan for legacy rows.
+        UUID clinicId = rx.getEpisode() != null && rx.getEpisode().getAssignedClinic() != null
+                ? rx.getEpisode().getAssignedClinic().getId()
+                : rx.getCarePlan().getClinic().getId();
         PrescriptionDeliveryDao delivery = deliveryResolver.resolve(clinicId);
         DeliveryResult result = delivery.deliver(rx);
 
