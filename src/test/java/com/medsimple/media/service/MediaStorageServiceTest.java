@@ -49,8 +49,9 @@ class MediaStorageServiceTest {
         StoredMedia result = service.upload(new byte[]{1, 2, 3}, "image/jpeg", "1.2.3.4");
 
         assertThat(result.mediaUrl()).isEqualTo("/api/v1/media/" + mediaId);
-        // Audit carries uploader + type + size; never the bytes.
-        verify(auditService).log(uploader, "MEDIA_UPLOADED", "symptom_media", mediaId, "1.2.3.4", "image/jpeg;3b");
+        // Audit carries uploader + type + size as structured JSON metadata; never the bytes.
+        verify(auditService).log(uploader, "MEDIA_UPLOADED", "symptom_media", mediaId, "1.2.3.4",
+                java.util.Map.of("contentType", "image/jpeg", "bytes", 3));
     }
 
     @Test
