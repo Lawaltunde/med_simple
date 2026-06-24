@@ -1,6 +1,7 @@
 package com.medsimple.clinic.service;
 
 import com.medsimple.audit.service.AuditService;
+import com.medsimple.auth.security.AccessGuard;
 import com.medsimple.clinic.dto.*;
 import com.medsimple.clinic.entity.*;
 import com.medsimple.clinic.exception.ClinicNotFoundException;
@@ -8,6 +9,7 @@ import com.medsimple.clinic.repository.*;
 import com.medsimple.patient.repository.PatientRepository;
 import com.medsimple.shared.entity.User;
 import com.medsimple.shared.entity.UserRole;
+import org.springframework.security.access.AccessDeniedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,6 +36,7 @@ class ClinicServiceTest {
     @Mock PatientRepository userRepository;
     @Mock PasswordEncoder passwordEncoder;
     @Mock AuditService auditService;
+    @Mock AccessGuard accessGuard;
 
     @InjectMocks ClinicService clinicService;
 
@@ -52,6 +55,9 @@ class ClinicServiceTest {
                 .active(true)
                 .createdAt(OffsetDateTime.now())
                 .build();
+        // Default the caller to a SUPER_ADMIN so the clinic-scope guard passes; the denial path is
+        // exercised explicitly below.
+        lenient().when(accessGuard.hasRole(UserRole.SUPER_ADMIN)).thenReturn(true);
     }
 
     // ── getClinicsForUser (console "my clinics") ─────────────────────────────
@@ -170,6 +176,27 @@ class ClinicServiceTest {
         assertThat(response.email()).isEqualTo("dr.smith@clinic.ca");
         assertThat(response.role()).isEqualTo(StaffRole.PHYSICIAN);
         assertThat(response.licenseNumber()).isEqualTo("ON-12345");
+    }
+
+    @Test
+    void addStaff_clinicAdminOfAnotherClinic_isDenied() {
+        // Caller is a CLINIC_ADMIN (not SUPER_ADMIN) who does not belong to this clinic.
+        UUID callerId = UUID.randomUUID();
+        when(accessGuard.hasRole(UserRole.SUPER_ADMIN)).thenReturn(false);
+        when(accessGuard.currentUserId()).thenReturn(callerId);
+        when(staffRepository.existsByClinicIdAndUserId(clinicId, callerId)).thenReturn(false);
+
+        AddStaffRequest request = new AddStaffRequest(
+                "dr.smith@clinic.ca", "password123", "John", "Smith",
+                "416-555-0200", StaffRole.PHYSICIAN, "ON-12345", "General Practice");
+
+        assertThatThrownBy(() -> clinicService.addStaff(clinicId, request, "127.0.0.1"))
+                .isInstanceOf(AccessDeniedException.class)
+                .hasMessageContaining("your own clinic");
+
+        // Nothing was created.
+        verify(staffRepository, never()).save(any());
+        verify(userRepository, never()).save(any());
     }
 
     // ── setCapability ─────────────────────────────────────────────────────────

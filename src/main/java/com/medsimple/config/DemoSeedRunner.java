@@ -38,6 +38,8 @@ public class DemoSeedRunner implements ApplicationRunner {
 
     public static final String DEMO_PHYSICIAN_EMAIL = "physician@demo.medsimple";
     private static final String DEMO_PHYSICIAN_PASSWORD = "Physician123!";
+    public static final String DEMO_ADMIN_EMAIL = "admin@demo.medsimple";
+    private static final String DEMO_ADMIN_PASSWORD = "Admin123!";
     public static final String DEMO_PATIENT_EMAIL = "patient@demo.medsimple";
     private static final String DEMO_PATIENT_PASSWORD = "Patient123!";
     private static final String DEMO_CLINIC_NAME = "MedSimple Demo Family Practice";
@@ -82,6 +84,28 @@ public class DemoSeedRunner implements ApplicationRunner {
                     .build());
 
             log.info("Seeded demo physician login {} / {}", DEMO_PHYSICIAN_EMAIL, DEMO_PHYSICIAN_PASSWORD);
+        }
+
+        if (userRepository.findByEmail(DEMO_ADMIN_EMAIL).isEmpty()) {
+            // A clinic admin who belongs to the demo clinic — the only role that may onboard staff.
+            User admin = userRepository.save(User.builder()
+                    .email(DEMO_ADMIN_EMAIL)
+                    .passwordHash(passwordEncoder.encode(DEMO_ADMIN_PASSWORD))
+                    .role(UserRole.CLINIC_ADMIN)
+                    .firstName("Alex")
+                    .lastName("Admin")
+                    .active(true)
+                    .emailVerified(true)
+                    .build());
+
+            staffRepository.save(ClinicStaff.builder()
+                    .clinic(clinic)
+                    .user(admin)
+                    .role(StaffRole.CLINIC_ADMIN)
+                    .active(true)
+                    .build());
+
+            log.info("Seeded demo clinic admin login {} / {}", DEMO_ADMIN_EMAIL, DEMO_ADMIN_PASSWORD);
         }
 
         if (userRepository.findByEmail(DEMO_PATIENT_EMAIL).isEmpty()) {
