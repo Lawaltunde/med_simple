@@ -117,6 +117,15 @@
             <artifactId>s3</artifactId>
         </dependency>
 
+        <!-- HAPI FHIR R4 structures — typed FHIR resource modeling + serialization for the
+             electronic lab requisition (ServiceRequest). Transport uses Spring's RestClient, so we
+             don't pull HAPI's HTTP stack. Only exercised when a clinic has LAB_ELECTRONIC enabled. -->
+        <dependency>
+            <groupId>ca.uhn.hapi.fhir</groupId>
+            <artifactId>hapi-fhir-structures-r4</artifactId>
+            <version>7.6.0</version>
+        </dependency>
+
         <!-- Flyway migrations -->
         <dependency>
             <groupId>org.flywaydb</groupId>
