@@ -15,11 +15,11 @@ export function getPrescription(id: string): Promise<Prescription> {
 }
 
 /**
- * GET /api/v1/care-plans/:carePlanId/prescriptions
- * Lists all prescriptions for a care plan, newest first.
+ * GET /api/v1/episodes/:episodeId/prescriptions
+ * Lists all prescriptions written for an episode, newest first.
  */
-export function listCarePlanPrescriptions(carePlanId: string): Promise<Prescription[]> {
-  return api<Prescription[]>(`/care-plans/${carePlanId}/prescriptions`);
+export function listEpisodePrescriptions(episodeId: string): Promise<Prescription[]> {
+  return api<Prescription[]>(`/episodes/${episodeId}/prescriptions`);
 }
 
 /**

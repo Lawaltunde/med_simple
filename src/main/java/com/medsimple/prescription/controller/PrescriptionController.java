@@ -38,6 +38,11 @@ public class PrescriptionController {
         return ResponseEntity.ok(prescriptionService.getCarePlanPrescriptions(carePlanId));
     }
 
+    @GetMapping("/api/v1/episodes/{episodeId}/prescriptions")
+    public ResponseEntity<List<PrescriptionResponse>> getForEpisode(@PathVariable UUID episodeId) {
+        return ResponseEntity.ok(prescriptionService.getEpisodePrescriptions(episodeId));
+    }
+
     @GetMapping("/api/v1/patients/{patientId}/prescriptions")
     public ResponseEntity<List<PrescriptionResponse>> getForPatient(@PathVariable UUID patientId) {
         return ResponseEntity.ok(prescriptionService.getPatientPrescriptions(patientId));
