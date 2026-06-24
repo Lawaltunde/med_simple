@@ -60,3 +60,6 @@ frontend/*.tsbuildinfo
 src/main/resources/static/index.html
 src/main/resources/static/assets/
 src/main/resources/static/banners_logo/
+
+### Agent git worktrees — local scratch, never tracked or indexed
+.claude/worktrees/
