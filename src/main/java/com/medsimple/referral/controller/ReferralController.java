@@ -38,6 +38,11 @@ public class ReferralController {
         return ResponseEntity.ok(referralService.getCarePlanReferrals(carePlanId));
     }
 
+    @GetMapping("/api/v1/episodes/{episodeId}/referrals")
+    public ResponseEntity<List<ReferralResponse>> getForEpisode(@PathVariable UUID episodeId) {
+        return ResponseEntity.ok(referralService.getEpisodeReferrals(episodeId));
+    }
+
     @GetMapping("/api/v1/patients/{patientId}/referrals")
     public ResponseEntity<List<ReferralResponse>> getForPatient(@PathVariable UUID patientId) {
         return ResponseEntity.ok(referralService.getPatientReferrals(patientId));

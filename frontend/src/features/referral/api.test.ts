@@ -4,7 +4,7 @@ import {
   cancelReferral,
   confirmSpecialty,
   createReferral,
-  getCarePlanReferrals,
+  getEpisodeReferrals,
   getPatientReferrals,
   getReferral,
   submitReferral,
@@ -18,11 +18,11 @@ const methodOf = (i: number) => (mockApi.mock.calls[i][1] as RequestInit | undef
 describe("referral api", () => {
   beforeEach(() => mockApi.mockReset().mockResolvedValue({}));
 
-  it("createReferral POSTs carePlanId, clinicalSummary, and urgency", async () => {
-    await createReferral({ carePlanId: "cp-1", clinicalSummary: "Chest pain", urgency: "URGENT" });
+  it("createReferral POSTs episodeId, clinicalSummary, and urgency", async () => {
+    await createReferral({ episodeId: "ep-1", clinicalSummary: "Chest pain", urgency: "URGENT" });
     expect(mockApi.mock.calls[0][0]).toBe("/referrals");
     expect(methodOf(0)).toBe("POST");
-    expect(bodyOf(0)).toEqual({ carePlanId: "cp-1", clinicalSummary: "Chest pain", urgency: "URGENT" });
+    expect(bodyOf(0)).toEqual({ episodeId: "ep-1", clinicalSummary: "Chest pain", urgency: "URGENT" });
   });
 
   it("getReferral GETs by id", async () => {
@@ -31,9 +31,9 @@ describe("referral api", () => {
     expect(methodOf(0)).toBeUndefined(); // default GET
   });
 
-  it("getCarePlanReferrals GETs the nested care-plan path", async () => {
-    await getCarePlanReferrals("cp-2");
-    expect(mockApi.mock.calls[0][0]).toBe("/care-plans/cp-2/referrals");
+  it("getEpisodeReferrals GETs the nested episode path", async () => {
+    await getEpisodeReferrals("ep-2");
+    expect(mockApi.mock.calls[0][0]).toBe("/episodes/ep-2/referrals");
   });
 
   it("getPatientReferrals GETs the patient-scoped path", async () => {

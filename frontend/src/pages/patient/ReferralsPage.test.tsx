@@ -24,7 +24,8 @@ vi.mock("@/features/referral/api", () => ({
 function referral(over: Partial<Referral>): Referral {
   return {
     id: "ref-1",
-    carePlanId: "cp-1",
+    episodeId: "ep-1",
+    carePlanId: null,
     patientId: "patient-1",
     referringPhysicianId: "doc-1",
     aiSuggestedSpecialty: "Cardiology",
