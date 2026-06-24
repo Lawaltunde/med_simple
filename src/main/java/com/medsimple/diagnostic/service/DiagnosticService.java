@@ -74,7 +74,11 @@ public class DiagnosticService {
                     "Only a DRAFT requisition can be sent (was " + req.getStatus() + ")");
         }
 
-        UUID clinicId = req.getCarePlan().getClinic().getId();
+        // Orders hang off the episode (care plan is optional since the re-parent), so the clinic
+        // comes from the episode's assigned clinic, falling back to the care plan for legacy rows.
+        UUID clinicId = req.getEpisode() != null && req.getEpisode().getAssignedClinic() != null
+                ? req.getEpisode().getAssignedClinic().getId()
+                : req.getCarePlan().getClinic().getId();
         RequisitionDeliveryDao delivery = deliveryResolver.resolve(clinicId);
         RequisitionDeliveryResult result = delivery.deliver(req);
 
