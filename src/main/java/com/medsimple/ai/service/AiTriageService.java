@@ -9,6 +9,7 @@ import com.medsimple.auth.security.AccessGuard;
 import com.medsimple.careplan.entity.CareSuggestion;
 import com.medsimple.careplan.entity.CareSuggestionStatus;
 import com.medsimple.careplan.repository.CareSuggestionRepository;
+import com.medsimple.careplan.service.OrderSuggestionGuardrail;
 import com.medsimple.careplan.service.SuggestionGuardrail;
 import com.medsimple.symptom.dto.EpisodeResponse;
 import com.medsimple.symptom.dto.SubmissionResponse;
@@ -38,6 +39,7 @@ public class AiTriageService {
     private final AccessGuard accessGuard;
     private final CareSuggestionRepository careSuggestionRepository;
     private final SuggestionGuardrail suggestionGuardrail;
+    private final OrderSuggestionGuardrail orderSuggestionGuardrail;
     private final PlanRetriever planRetriever;
 
     private static final int RAG_EXEMPLARS = 3;
@@ -126,10 +128,18 @@ public class AiTriageService {
             log.warn("Care suggestion guardrail blocked a proposal for episode {}", episode.getId());
             builder.status(CareSuggestionStatus.FAILED).rejectReason(SuggestionGuardrail.BLOCK_REASON);
         } else {
+            // Sanitize the AI's suggested orders deterministically before they are ever persisted or
+            // surfaced for one-click prefill: drop invasive/controlled tests, cap the list, and map
+            // the specialty to a recognised value (or drop it). The AI proposes; this guarantees the
+            // physician only ever sees a safe, advisory prefill.
+            List<String> tests = orderSuggestionGuardrail.sanitizeTests(sc.suggestedTests());
+            String specialty = orderSuggestionGuardrail.sanitizeSpecialty(sc.referralSpecialty());
             builder.status(CareSuggestionStatus.PROPOSED)
                     .suggestedPlan(sc.plan())
                     .rationale(sc.rationale())
-                    .suggestedFollowUpDays(sanitizeFollowUp(sc.followUpDays()));
+                    .suggestedFollowUpDays(sanitizeFollowUp(sc.followUpDays()))
+                    .suggestedReferralSpecialty(specialty)
+                    .suggestedTests(tests == null ? null : String.join("\n", tests));
         }
 
         CareSuggestion saved = careSuggestionRepository.save(builder.build());

@@ -26,6 +26,12 @@ vi.mock("@/features/careplan/api", () => ({
   respondToFollowUp: vi.fn(),
 }));
 
+// AI care suggestion: mock the hook directly (matches BookAppointmentCard.test).
+const suggestionData = vi.fn<() => unknown>(() => undefined);
+vi.mock("@/features/careplan/hooks", () => ({
+  useEpisodeSuggestion: () => ({ data: suggestionData() }),
+}));
+
 // ── Referral network layer ─────────────────────────────────────────────────────
 
 const getEpisodeReferralsMock = vi.fn();
@@ -100,6 +106,23 @@ function referral(over: Partial<Referral> = {}): Referral {
   };
 }
 
+function suggestion(over: Record<string, unknown> = {}) {
+  return {
+    id: "sug-1",
+    episodeId: "ep-1",
+    status: "PROPOSED",
+    suggestedPlan: "Supportive care",
+    rationale: "viral",
+    suggestedFollowUpDays: null,
+    suggestedReferralSpecialty: "Cardiology",
+    suggestedTests: [],
+    adapter: "openai",
+    model: "gpt-4o",
+    createdAt: "2026-06-01T10:00:00Z",
+    ...over,
+  };
+}
+
 function renderCard(ep: Episode = episode()) {
   const qc = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -121,6 +144,8 @@ describe("ReferralCard", () => {
     createReferralMock.mockReset();
     confirmSpecialtyMock.mockReset();
     submitReferralMock.mockReset();
+    suggestionData.mockReset();
+    suggestionData.mockReturnValue(undefined);
   });
 
   it("renders nothing for a non-physician user", async () => {
@@ -232,6 +257,39 @@ describe("ReferralCard", () => {
     await user.click(submitBtn);
 
     await waitFor(() => expect(submitReferralMock).toHaveBeenCalledWith("ref-1"));
+  });
+
+  it("shows the AI referral-specialty suggestion banner when there are no referrals yet", async () => {
+    getEpisodeReferralsMock.mockResolvedValue([]);
+    suggestionData.mockReturnValue(suggestion({ suggestedReferralSpecialty: "Cardiology" }));
+
+    renderCard();
+
+    expect(await screen.findByText(/AI suggests referral to Cardiology/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /use this/i })).toBeInTheDocument();
+  });
+
+  it("prefills the clinical summary with the AI specialty on 'Use this'", async () => {
+    getEpisodeReferralsMock.mockResolvedValue([]);
+    suggestionData.mockReturnValue(suggestion({ suggestedReferralSpecialty: "Dermatology" }));
+
+    const user = userEvent.setup();
+    renderCard();
+
+    await user.click(await screen.findByRole("button", { name: /use this/i }));
+
+    const textarea = await screen.findByPlaceholderText(/52-year-old/i);
+    expect(textarea).toHaveValue("Referral to Dermatology for further assessment of ");
+  });
+
+  it("does not show the AI banner when there is no suggested specialty", async () => {
+    getEpisodeReferralsMock.mockResolvedValue([]);
+    suggestionData.mockReturnValue(suggestion({ suggestedReferralSpecialty: null }));
+
+    renderCard();
+
+    expect(await screen.findByRole("button", { name: /create referral/i })).toBeInTheDocument();
+    expect(screen.queryByText(/AI suggests referral/i)).not.toBeInTheDocument();
   });
 
   it("shows delivery method and submitted status after submission", async () => {

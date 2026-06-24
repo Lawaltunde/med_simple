@@ -177,7 +177,20 @@ public class CarePlanService {
         return new CareSuggestionResponse(
                 s.getId(), s.getEpisode().getId(), s.getStatus(),
                 s.getSuggestedPlan(), s.getRationale(), s.getSuggestedFollowUpDays(),
+                s.getSuggestedReferralSpecialty(), splitTests(s.getSuggestedTests()),
                 s.getAdapter(), s.getModel(), s.getCreatedAt());
+    }
+
+    // Suggested tests are stored newline-delimited; expose them to the console as a list. Null/blank
+    // storage means no suggested tests (the common case, and every FAILED/blocked row).
+    private static List<String> splitTests(String tests) {
+        if (tests == null || tests.isBlank()) {
+            return List.of();
+        }
+        return java.util.Arrays.stream(tests.split("\n"))
+                .map(String::trim)
+                .filter(t -> !t.isEmpty())
+                .toList();
     }
 
     @Transactional(readOnly = true)
