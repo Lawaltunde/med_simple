@@ -103,10 +103,13 @@ class ClinicControllerTest {
     void addStaff_returns201() throws Exception {
         AddStaffRequest request = new AddStaffRequest(
                 "dr@clinic.ca", "password123", "John", "Smith",
-                null, StaffRole.PHYSICIAN, "ON-123", null);
+                null, StaffRole.PHYSICIAN, "ON-123", null,
+                "CPSO", "67890", "ON", null);
         StaffResponse response = new StaffResponse(UUID.randomUUID(), UUID.randomUUID(),
                 "John", "Smith", "dr@clinic.ca", StaffRole.PHYSICIAN,
-                "ON-123", null, true, OffsetDateTime.now());
+                "ON-123", null, "CPSO", "67890", "ON", null,
+                com.medsimple.clinic.entity.VerificationStatus.UNVERIFIED, null, null,
+                true, OffsetDateTime.now());
 
         when(clinicService.addStaff(eq(clinicId), any(), any())).thenReturn(response);
 
