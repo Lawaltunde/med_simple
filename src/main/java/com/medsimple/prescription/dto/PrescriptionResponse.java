@@ -8,6 +8,7 @@ import java.util.UUID;
 
 public record PrescriptionResponse(
         UUID id,
+        UUID episodeId,
         UUID carePlanId,
         UUID patientId,
         UUID prescribingPhysicianId,

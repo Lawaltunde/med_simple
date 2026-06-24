@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   cancelPrescription,
   createPrescription,
-  listCarePlanPrescriptions,
+  listEpisodePrescriptions,
   listPatientPrescriptions,
   sendPrescription,
   signPrescription,
@@ -12,17 +12,17 @@ import type { CreatePrescriptionInput, SendPrescriptionInput } from "./types";
 const POLL_MS = 30_000;
 
 export const prescriptionKeys = {
-  forCarePlan: (carePlanId: string) => ["prescriptions", "care-plan", carePlanId] as const,
+  forEpisode: (episodeId: string) => ["prescriptions", "episode", episodeId] as const,
   forPatient: (patientId: string) => ["prescriptions", "patient", patientId] as const,
   detail: (id: string) => ["prescriptions", "detail", id] as const,
 };
 
-/** Physician view — prescriptions scoped to a single care plan. */
-export function useCarePlanPrescriptions(carePlanId: string | undefined) {
+/** Physician view — prescriptions scoped to a single episode. */
+export function useEpisodePrescriptions(episodeId: string | undefined) {
   return useQuery({
-    queryKey: prescriptionKeys.forCarePlan(carePlanId ?? ""),
-    queryFn: () => listCarePlanPrescriptions(carePlanId!),
-    enabled: !!carePlanId,
+    queryKey: prescriptionKeys.forEpisode(episodeId ?? ""),
+    queryFn: () => listEpisodePrescriptions(episodeId!),
+    enabled: !!episodeId,
     refetchInterval: POLL_MS,
   });
 }
@@ -39,8 +39,8 @@ export function usePatientPrescriptions(patientId: string | undefined) {
 
 function usePrescriptionInvalidation() {
   const qc = useQueryClient();
-  return (opts: { carePlanId?: string; patientId?: string; prescriptionId?: string }) => {
-    if (opts.carePlanId) qc.invalidateQueries({ queryKey: prescriptionKeys.forCarePlan(opts.carePlanId) });
+  return (opts: { episodeId?: string; patientId?: string; prescriptionId?: string }) => {
+    if (opts.episodeId) qc.invalidateQueries({ queryKey: prescriptionKeys.forEpisode(opts.episodeId) });
     if (opts.patientId) qc.invalidateQueries({ queryKey: prescriptionKeys.forPatient(opts.patientId) });
     if (opts.prescriptionId) qc.invalidateQueries({ queryKey: prescriptionKeys.detail(opts.prescriptionId) });
   };
@@ -50,7 +50,7 @@ export function useCreatePrescription() {
   const invalidate = usePrescriptionInvalidation();
   return useMutation({
     mutationFn: createPrescription,
-    onSuccess: (rx) => invalidate({ carePlanId: rx.carePlanId, patientId: rx.patientId }),
+    onSuccess: (rx) => invalidate({ episodeId: rx.episodeId, patientId: rx.patientId }),
   });
 }
 
@@ -59,7 +59,7 @@ export function useSignPrescription() {
   return useMutation({
     mutationFn: (id: string) => signPrescription(id),
     onSuccess: (rx) =>
-      invalidate({ carePlanId: rx.carePlanId, patientId: rx.patientId, prescriptionId: rx.id }),
+      invalidate({ episodeId: rx.episodeId, patientId: rx.patientId, prescriptionId: rx.id }),
   });
 }
 
@@ -69,7 +69,7 @@ export function useSendPrescription() {
     mutationFn: ({ id, input }: { id: string; input?: SendPrescriptionInput }) =>
       sendPrescription(id, input),
     onSuccess: (rx) =>
-      invalidate({ carePlanId: rx.carePlanId, patientId: rx.patientId, prescriptionId: rx.id }),
+      invalidate({ episodeId: rx.episodeId, patientId: rx.patientId, prescriptionId: rx.id }),
   });
 }
 
@@ -78,7 +78,7 @@ export function useCancelPrescription() {
   return useMutation({
     mutationFn: (id: string) => cancelPrescription(id),
     onSuccess: (rx) =>
-      invalidate({ carePlanId: rx.carePlanId, patientId: rx.patientId, prescriptionId: rx.id }),
+      invalidate({ episodeId: rx.episodeId, patientId: rx.patientId, prescriptionId: rx.id }),
   });
 }
 

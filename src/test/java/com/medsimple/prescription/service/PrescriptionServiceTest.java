@@ -19,6 +19,9 @@ import com.medsimple.prescription.repository.PrescriptionRepository;
 import com.medsimple.shared.dto.AllergyDto;
 import com.medsimple.shared.entity.User;
 import com.medsimple.shared.entity.UserRole;
+import com.medsimple.symptom.entity.EpisodeStatus;
+import com.medsimple.symptom.entity.SymptomEpisode;
+import com.medsimple.symptom.repository.SymptomEpisodeRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -41,6 +44,7 @@ class PrescriptionServiceTest {
 
     @Mock PrescriptionRepository prescriptionRepository;
     @Mock CarePlanRepository carePlanRepository;
+    @Mock SymptomEpisodeRepository episodeRepository;
     @Mock PatientProfileRepository patientProfileRepository;
     @Mock MedicationSafetyDao medicationSafetyDao;
     @Mock PrescriptionDeliveryResolver deliveryResolver;
@@ -54,6 +58,7 @@ class PrescriptionServiceTest {
     private User physician;
     private Clinic clinic;
     private CarePlan carePlan;
+    private SymptomEpisode episode;
     private UUID carePlanId;
 
     @BeforeEach
@@ -66,11 +71,14 @@ class PrescriptionServiceTest {
         clinic = Clinic.builder().id(UUID.randomUUID()).name("Clinic").build();
         carePlan = CarePlan.builder().id(carePlanId).patient(patient).physician(physician)
                 .clinic(clinic).createdAt(OffsetDateTime.now()).updatedAt(OffsetDateTime.now()).build();
+        episode = SymptomEpisode.builder().id(UUID.randomUUID()).patient(patient)
+                .assignedClinic(clinic).assignedPhysician(physician).status(EpisodeStatus.IN_PROGRESS)
+                .createdAt(OffsetDateTime.now()).updatedAt(OffsetDateTime.now()).build();
     }
 
     private Prescription draft() {
         return Prescription.builder()
-                .id(UUID.randomUUID()).carePlan(carePlan).patient(patient)
+                .id(UUID.randomUUID()).episode(episode).carePlan(carePlan).patient(patient)
                 .prescribingPhysician(physician).medicationName("Amoxicillin")
                 .dosage("500mg").frequency("TID").refills(0).aiSafetyChecks("{}")
                 .status(PrescriptionStatus.DRAFT)
@@ -82,7 +90,7 @@ class PrescriptionServiceTest {
     @Test
     void create_runsSafetyCheckWithPatientAllergies() {
         CreatePrescriptionRequest request = new CreatePrescriptionRequest(
-                carePlanId, "Amoxicillin", null, "500mg", "TID", null, 0, "Take with food");
+                episode.getId(), "Amoxicillin", null, "500mg", "TID", null, 0, "Take with food");
 
         PatientProfile profile = PatientProfile.builder()
                 .user(patient)
@@ -90,7 +98,7 @@ class PrescriptionServiceTest {
                 .currentMedications(List.of())
                 .build();
 
-        when(carePlanRepository.findById(carePlanId)).thenReturn(Optional.of(carePlan));
+        when(episodeRepository.findById(episode.getId())).thenReturn(Optional.of(episode));
         when(patientProfileRepository.findByUserId(patient.getId())).thenReturn(Optional.of(profile));
         when(medicationSafetyDao.check(any())).thenReturn(
                 new SafetyCheckResult(List.of(), List.of("allergy to Penicillin"), List.of()));
@@ -98,9 +106,12 @@ class PrescriptionServiceTest {
 
         PrescriptionResponse response = prescriptionService.createPrescription(request, "127.0.0.1");
 
-        // The safety check received the patient's allergy list (PHI-stripped to names).
+        // The safety check received the patient's allergy list (PHI-stripped to names) — derived
+        // from the episode's patient, with no care plan involved.
         verify(medicationSafetyDao).check(argThat(ctx ->
                 ctx.allergies().contains("Penicillin") && ctx.medicationName().equals("Amoxicillin")));
+        assertThat(response.episodeId()).isEqualTo(episode.getId());
+        assertThat(response.carePlanId()).isNull();
         assertThat(response.status()).isEqualTo(PrescriptionStatus.DRAFT);
         assertThat(response.aiSafetyChecks()).contains("Penicillin");
     }
