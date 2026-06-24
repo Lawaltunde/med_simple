@@ -7,6 +7,7 @@ import { SignupPage } from "@/pages/SignupPage";
 import { PatientApp } from "@/pages/patient/PatientApp";
 import { PatientHome } from "@/pages/patient/PatientHome";
 import { NewSymptomCheck } from "@/pages/patient/NewSymptomCheck";
+import { SymptomChat } from "@/pages/patient/SymptomChat";
 import { EpisodeDetail } from "@/pages/patient/EpisodeDetail";
 import { CarePlansPage } from "@/pages/patient/CarePlansPage";
 import { CarePlanDetail } from "@/pages/patient/CarePlanDetail";
@@ -45,6 +46,7 @@ export function App() {
             }
           >
             <Route index element={<PatientHome />} />
+            <Route path="assistant" element={<SymptomChat />} />
             <Route path="new" element={<NewSymptomCheck />} />
             <Route path="episodes/:id" element={<EpisodeDetail />} />
             <Route path="care-plans" element={<CarePlansPage />} />
