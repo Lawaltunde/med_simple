@@ -66,22 +66,26 @@ export function PatientHome() {
         </section>
       )}
 
-      {/* Three ways to ask */}
+      {/* Three ways to ask — each opens the new check in its mode */}
       <section>
         <h3 className="mb-4 text-sm font-semibold uppercase tracking-wide text-muted">Three ways to ask</h3>
         <div className="grid gap-4 sm:grid-cols-3">
           {[
-            { icon: MessageSquareText, title: "Text it", body: "Describe it in your own words." },
-            { icon: Camera, title: "Photograph it", body: "Snap a rash, cut, or swelling." },
-            { icon: Mic, title: "Speak it", body: "Record a voice note instead." },
+            { icon: MessageSquareText, title: "Text it", body: "Describe it in your own words.", to: "/app/new" },
+            { icon: Camera, title: "Photograph it", body: "Snap a rash, cut, or swelling.", to: "/app/new?mode=PHOTO" },
+            { icon: Mic, title: "Speak it", body: "Record a voice note instead.", to: "/app/new?mode=VOICE" },
           ].map((c) => (
-            <div key={c.title} className="rounded-2xl border border-line bg-white p-5">
+            <Link
+              key={c.title}
+              to={c.to}
+              className="group rounded-2xl border border-line bg-white p-5 transition-colors hover:border-brand-300 hover:bg-brand-50/40"
+            >
               <span className="inline-flex size-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
                 <c.icon className="size-5" />
               </span>
               <h4 className="mt-4 font-bold text-brand-900">{c.title}</h4>
               <p className="mt-1 text-sm text-muted">{c.body}</p>
-            </div>
+            </Link>
           ))}
         </div>
       </section>
