@@ -1,10 +1,11 @@
-import { Home, PlusCircle, ClipboardList, CalendarDays, Pill, FlaskConical, Send, Bell, ShieldCheck } from "lucide-react";
+import { Home, Bot, PlusCircle, ClipboardList, CalendarDays, Pill, FlaskConical, Send, Bell, ShieldCheck } from "lucide-react";
 import { AppShell, type NavItem } from "@/components/AppShell";
 import { useAuth } from "@/auth/AuthProvider";
 import { useUnreadCount } from "@/features/notifications/hooks";
 
 const patientNav: NavItem[] = [
   { label: "Home", to: "/app", icon: Home, end: true },
+  { label: "AI Assistant", to: "/app/assistant", icon: Bot },
   { label: "New symptom", to: "/app/new", icon: PlusCircle },
   { label: "Care plans", to: "/app/care-plans", icon: ClipboardList },
   { label: "Appointments", to: "/app/appointments", icon: CalendarDays },
