@@ -43,6 +43,7 @@ class PatientServiceTest {
     @Mock EntityManager entityManager;
     @Mock com.medsimple.auth.security.AccessGuard accessGuard;
     @Mock com.medsimple.patient.validation.HealthCardValidator healthCardValidator;
+    @Mock com.medsimple.patient.eligibility.HealthCardEligibilityDao eligibilityDao;
 
     @InjectMocks PatientService patientService;
 
@@ -52,6 +53,11 @@ class PatientServiceTest {
 
     @BeforeEach
     void setUp() {
+        // Eligibility check defaults to the format-only result so addHealthCoverage proceeds.
+        lenient().when(eligibilityDao.check(any(), any(), any())).thenReturn(
+                new com.medsimple.patient.eligibility.EligibilityResult(
+                        com.medsimple.patient.eligibility.EligibilityStatus.UNKNOWN, "FORMAT_ONLY", "x"));
+
         userId = UUID.randomUUID();
         sampleUser = User.builder()
                 .id(userId)
