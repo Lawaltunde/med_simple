@@ -1,0 +1,74 @@
+[
+  {
+    "id": "cardiology-1",
+    "category": "cardiology",
+    "clinicalSummary": "Exertional chest tightness relieved by rest over three months, family history of early coronary disease, borderline hypertension.",
+    "acceptableSpecialty": ["Cardiology"]
+  },
+  {
+    "id": "dermatology-1",
+    "category": "dermatology",
+    "clinicalSummary": "Chronic scaly plaques on elbows and knees with nail pitting, partial response to topical steroids, suspected psoriasis.",
+    "acceptableSpecialty": ["Dermatology"]
+  },
+  {
+    "id": "gastroenterology-1",
+    "category": "gastroenterology",
+    "clinicalSummary": "Six weeks of bloody diarrhea, abdominal cramping and weight loss, raised inflammatory markers, query inflammatory bowel disease.",
+    "acceptableSpecialty": ["Gastroenterology"]
+  },
+  {
+    "id": "neurology-1",
+    "category": "neurology",
+    "clinicalSummary": "Recurrent unilateral throbbing headaches with aura and photophobia, three episodes a month, not controlled on simple analgesia.",
+    "acceptableSpecialty": ["Neurology"]
+  },
+  {
+    "id": "orthopedics-1",
+    "category": "orthopedics",
+    "clinicalSummary": "Chronic right knee pain with locking and giving way after a sports injury, MRI shows a meniscal tear, failed physiotherapy.",
+    "acceptableSpecialty": ["Orthopedics", "Orthopedic Surgery"]
+  },
+  {
+    "id": "respirology-1",
+    "category": "respirology",
+    "clinicalSummary": "Progressive exertional breathlessness and chronic productive cough in a long-term smoker, spirometry shows airflow obstruction.",
+    "acceptableSpecialty": ["Respirology", "Pulmonology"]
+  },
+  {
+    "id": "endocrinology-1",
+    "category": "endocrinology",
+    "clinicalSummary": "Poorly controlled type 2 diabetes on maximal oral agents with HbA1c of 10.2%, needs insulin initiation and review.",
+    "acceptableSpecialty": ["Endocrinology"]
+  },
+  {
+    "id": "psychiatry-1",
+    "category": "psychiatry",
+    "clinicalSummary": "Eight months of low mood, anhedonia, poor sleep and passive suicidal thoughts, inadequate response to two antidepressant trials.",
+    "acceptableSpecialty": ["Psychiatry"]
+  },
+  {
+    "id": "ophthalmology-1",
+    "category": "ophthalmology",
+    "clinicalSummary": "Gradual painless loss of vision in both eyes with glare and difficulty driving at night, suspected cataracts.",
+    "acceptableSpecialty": ["Ophthalmology"]
+  },
+  {
+    "id": "urology-1",
+    "category": "urology",
+    "clinicalSummary": "Older man with weak urinary stream, nocturia and hesitancy, raised PSA on screening, enlarged prostate on exam.",
+    "acceptableSpecialty": ["Urology"]
+  },
+  {
+    "id": "nephrology-1",
+    "category": "nephrology",
+    "clinicalSummary": "Declining renal function with eGFR 28 and persistent proteinuria over six months, hypertension difficult to control.",
+    "acceptableSpecialty": ["Nephrology"]
+  },
+  {
+    "id": "ent-1",
+    "category": "ent",
+    "clinicalSummary": "Unilateral nasal obstruction with recurrent epistaxis and reduced sense of smell over three months in an adult.",
+    "acceptableSpecialty": ["ENT", "Otolaryngology"]
+  }
+]
