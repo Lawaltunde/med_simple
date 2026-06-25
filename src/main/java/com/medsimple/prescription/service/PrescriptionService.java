@@ -17,6 +17,7 @@ import com.medsimple.prescription.exception.InvalidPrescriptionStateException;
 import com.medsimple.prescription.exception.PrescriptionNotFoundException;
 import com.medsimple.prescription.repository.PrescriptionRepository;
 import com.medsimple.shared.entity.User;
+import com.medsimple.shared.exception.BusinessRuleException;
 import com.medsimple.symptom.entity.SymptomEpisode;
 import com.medsimple.symptom.exception.EpisodeNotFoundException;
 import com.medsimple.symptom.repository.SymptomEpisodeRepository;
@@ -50,7 +51,7 @@ public class PrescriptionService {
         SymptomEpisode episode = episodeRepository.findById(request.episodeId())
                 .orElseThrow(() -> new EpisodeNotFoundException(request.episodeId()));
         if (episode.getAssignedClinic() == null || episode.getAssignedPhysician() == null) {
-            throw new IllegalStateException(
+            throw new BusinessRuleException(
                     "Episode " + request.episodeId() + " must be assigned to a physician before prescribing");
         }
 

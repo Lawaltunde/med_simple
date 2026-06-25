@@ -2,6 +2,7 @@ package com.medsimple.careplan.service;
 
 import com.medsimple.audit.service.AuditService;
 import com.medsimple.auth.security.AccessGuard;
+import com.medsimple.shared.exception.BusinessRuleException;
 import com.medsimple.careplan.dto.*;
 import com.medsimple.careplan.entity.CarePlan;
 import com.medsimple.careplan.entity.CarePlanStatus;
@@ -57,7 +58,7 @@ public class CarePlanService {
                 .orElseThrow(() -> new PatientNotFoundException(request.physicianId()));
 
         if (episode.getAssignedClinic() == null) {
-            throw new IllegalStateException(
+            throw new BusinessRuleException(
                     "Episode " + request.episodeId() + " has no assigned clinic; cannot create a care plan");
         }
 
@@ -114,7 +115,7 @@ public class CarePlanService {
 
         SymptomEpisode episode = suggestion.getEpisode();
         if (episode.getAssignedClinic() == null) {
-            throw new IllegalStateException(
+            throw new BusinessRuleException(
                     "Episode " + episode.getId() + " has no assigned clinic; cannot create a care plan");
         }
 
