@@ -2,6 +2,7 @@ package com.medsimple.diagnostic.service;
 
 import com.medsimple.audit.service.AuditService;
 import com.medsimple.auth.security.AccessGuard;
+import com.medsimple.shared.exception.BusinessRuleException;
 import com.medsimple.careplan.entity.CarePlan;
 import com.medsimple.careplan.exception.CarePlanNotFoundException;
 import com.medsimple.careplan.repository.CarePlanRepository;
@@ -45,7 +46,7 @@ public class DiagnosticService {
         SymptomEpisode episode = episodeRepository.findById(request.episodeId())
                 .orElseThrow(() -> new EpisodeNotFoundException(request.episodeId()));
         if (episode.getAssignedClinic() == null || episode.getAssignedPhysician() == null) {
-            throw new IllegalStateException(
+            throw new BusinessRuleException(
                     "Episode " + request.episodeId() + " must be assigned to a physician before ordering");
         }
 
