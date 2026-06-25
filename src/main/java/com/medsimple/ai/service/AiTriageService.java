@@ -51,6 +51,50 @@ public class AiTriageService {
         SymptomEpisode episode = episodeRepository.findById(episodeId)
                 .orElseThrow(() -> new EpisodeNotFoundException(episodeId));
         accessGuard.requirePatientSelfOrStaff(episode.getPatient().getId());
+        return triage(episode);
+    }
+
+    /**
+     * Backstop for the async media pipeline. The synchronous patient flow chains
+     * process→triage, but if that chain does not complete (slow transcription, a dropped client
+     * connection, the patient navigating away), the media poller transcribes/analyzes the media
+     * out-of-band yet the episode is left assessed-but-not-triaged. The poller calls this after it
+     * completes a submission so a voice/photo episode is never stuck transcribed-but-not-triaged.
+     *
+     * <p>Ungated — the poller runs without a security context. Conservative and idempotent: only
+     * triages an episode still in SUBMITTED (never re-runs one the sync flow or a physician already
+     * handled), waits until no submission is still PENDING, and needs at least one completed
+     * submission that carries symptom text.
+     */
+    @Transactional
+    public void triageEpisodeIfReady(UUID episodeId) {
+        SymptomEpisode episode = episodeRepository.findById(episodeId).orElse(null);
+        if (episode == null || episode.getStatus() != EpisodeStatus.SUBMITTED) {
+            return;
+        }
+        List<SymptomSubmission> submissions =
+                submissionRepository.findByEpisodeIdOrderBySubmittedAtAsc(episodeId);
+        // Don't triage on a partial picture: wait until every voice/photo submission is done.
+        boolean anyPending = submissions.stream()
+                .anyMatch(s -> s.getProcessingStatus() == ProcessingStatus.PENDING);
+        if (anyPending) {
+            return;
+        }
+        // Nothing to triage if no completed submission yielded symptom text (e.g. failed-only media).
+        boolean hasText = submissions.stream()
+                .filter(s -> s.getProcessingStatus() == ProcessingStatus.COMPLETED)
+                .anyMatch(s -> !symptomTextOf(s).isBlank());
+        if (!hasText) {
+            return;
+        }
+        triage(episode);
+    }
+
+    // The actual triage work, with no access gate. Reached via the gated {@link #triageEpisode}
+    // (caller-facing) or {@link #triageEpisodeIfReady} (trusted async poller).
+    @Transactional
+    public EpisodeResponse triage(SymptomEpisode episode) {
+        UUID episodeId = episode.getId();
 
         // Redact PHI (names, health-card/insurance numbers, phone, email, postal codes) from the
         // free-text BEFORE anything leaves for the model provider. CLAUDE.md: "PHI must be stripped
