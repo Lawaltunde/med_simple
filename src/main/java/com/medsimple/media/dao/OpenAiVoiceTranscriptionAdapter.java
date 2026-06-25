@@ -23,6 +23,11 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name = "ai.media.adapter", havingValue = "openai")
 public class OpenAiVoiceTranscriptionAdapter implements VoiceTranscriptionDao {
 
+    // Whisper fails intermittently on valid audio (timeout / rate-limit / 5xx); an immediate
+    // retry clears it. Three attempts with 250ms→500ms backoff before the clinician-review fallback.
+    private static final int MAX_ATTEMPTS = 3;
+    private static final long BASE_BACKOFF_MILLIS = 250L;
+
     private final OpenAiAudioTranscriptionModel transcriptionModel;
     private final MediaStorageDao mediaStorage;
 
@@ -35,12 +40,15 @@ public class OpenAiVoiceTranscriptionAdapter implements VoiceTranscriptionDao {
     @Override
     public String transcribe(String mediaUrl) {
         try {
-            MediaContent media = mediaStorage.resolve(mediaUrl);
-            return transcriptionModel.call(new AudioTranscriptionPrompt(media.resource()))
-                    .getResult().getOutput();
+            return MediaModelRetry.withRetry("OpenAI voice transcription", MAX_ATTEMPTS, BASE_BACKOFF_MILLIS,
+                    () -> {
+                        MediaContent media = mediaStorage.resolve(mediaUrl);
+                        return transcriptionModel.call(new AudioTranscriptionPrompt(media.resource()))
+                                .getResult().getOutput();
+                    });
         } catch (Exception e) {
-            // Log the failure, not the media or any identifier.
-            log.error("OpenAI voice transcription failed; falling back to clinician review note", e);
+            // Every attempt failed. Log the failure, not the media or any identifier.
+            log.error("OpenAI voice transcription failed after retries; falling back to clinician review note", e);
             return "[Voice note received. Automatic transcription failed; a clinician will review the recording.]";
         }
     }
