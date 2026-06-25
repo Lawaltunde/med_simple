@@ -418,4 +418,74 @@ class AiTriageServiceTest {
                 ctx.approvedPlanExamples().size() == 1
                         && ctx.approvedPlanExamples().get(0).contains("supportive care")));
     }
+
+    // ── async backstop: triageEpisodeIfReady (poller path, ungated) ──────────────
+
+    private SymptomSubmission voice(ProcessingStatus status, String transcription) {
+        return SymptomSubmission.builder()
+                .id(UUID.randomUUID()).episode(episode).patient(patient)
+                .inputType(InputType.VOICE).mediaUrl("/api/v1/media/x").transcription(transcription)
+                .processingStatus(status)
+                .submittedAt(OffsetDateTime.now()).createdAt(OffsetDateTime.now()).build();
+    }
+
+    @Test
+    void triageIfReady_completedVoiceInSubmittedEpisode_triagesWithoutGate() {
+        when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
+        when(submissionRepository.findByEpisodeIdOrderBySubmittedAtAsc(episodeId))
+                .thenReturn(List.of(voice(ProcessingStatus.COMPLETED, "sore throat for two days")));
+        when(aiTriageDao.analyze(any())).thenReturn(new TriageResult(UrgencyLevel.SEE_SOON, "Likely viral."));
+        when(episodeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        aiTriageService.triageEpisodeIfReady(episodeId);
+
+        assertThat(episode.getStatus()).isEqualTo(EpisodeStatus.AI_ANALYZED);
+        assertThat(episode.getAiUrgencyLevel()).isEqualTo(UrgencyLevel.SEE_SOON);
+        verify(aiTriageDao).analyze(any());
+        // The poller has no security context — the backstop must never hit the access gate.
+        verifyNoInteractions(accessGuard);
+    }
+
+    @Test
+    void triageIfReady_alreadyAnalyzed_isNoOp() {
+        episode.setStatus(EpisodeStatus.AI_ANALYZED);
+        when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
+
+        aiTriageService.triageEpisodeIfReady(episodeId);
+
+        verifyNoInteractions(aiTriageDao);
+        verify(submissionRepository, never()).findByEpisodeIdOrderBySubmittedAtAsc(any());
+    }
+
+    @Test
+    void triageIfReady_mediaStillPending_isNoOp() {
+        when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
+        when(submissionRepository.findByEpisodeIdOrderBySubmittedAtAsc(episodeId))
+                .thenReturn(List.of(voice(ProcessingStatus.COMPLETED, "headache"),
+                        voice(ProcessingStatus.PENDING, null)));
+
+        aiTriageService.triageEpisodeIfReady(episodeId);
+
+        verifyNoInteractions(aiTriageDao);
+    }
+
+    @Test
+    void triageIfReady_noSymptomText_isNoOp() {
+        when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
+        when(submissionRepository.findByEpisodeIdOrderBySubmittedAtAsc(episodeId))
+                .thenReturn(List.of(voice(ProcessingStatus.COMPLETED, "   ")));
+
+        aiTriageService.triageEpisodeIfReady(episodeId);
+
+        verifyNoInteractions(aiTriageDao);
+    }
+
+    @Test
+    void triageIfReady_episodeNotFound_isNoOp() {
+        when(episodeRepository.findById(episodeId)).thenReturn(Optional.empty());
+
+        aiTriageService.triageEpisodeIfReady(episodeId);
+
+        verifyNoInteractions(aiTriageDao);
+    }
 }
