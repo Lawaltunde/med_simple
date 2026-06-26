@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Loader2, ChevronRight, Inbox, Building2 } from "lucide-react";
 import { useMyClinics, useQueue } from "@/features/clinician/hooks";
+import { queueStats } from "@/features/clinician/display";
 import { UrgencyBadge, statusLabel, formatDateTime } from "@/features/symptom/display";
 
 export function QueuePage() {
@@ -8,6 +9,7 @@ export function QueuePage() {
   // POC: a physician works one clinic. Multi-clinic switching comes later.
   const clinic = clinics?.[0];
   const { data: queue, isLoading: queueLoading } = useQueue(clinic?.id);
+  const stats = queueStats(queue);
 
   if (clinicsLoading) {
     return <Centered><Loader2 className="size-5 animate-spin" /> Loading…</Centered>;
@@ -25,11 +27,28 @@ export function QueuePage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <header className="mb-6">
-        <h2 className="text-2xl font-extrabold tracking-tight text-brand-900">Triage queue</h2>
-        <p className="mt-1 text-muted">
-          {clinic.name} · ordered by clinical urgency, most urgent first.
-        </p>
+      <header className="mb-6 border-b border-line pb-5">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="text-2xl font-extrabold tracking-tight text-brand-900">Triage queue</h2>
+          <span className="shrink-0 text-sm font-medium text-muted">{clinic.name}</span>
+        </div>
+        {stats && (
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <StatPill>
+              <span className="tabular-nums">{stats.total}</span> waiting
+            </StatPill>
+            {stats.emergency > 0 && (
+              <StatPill color="var(--color-urgency-emergency)">
+                <span className="tabular-nums">{stats.emergency}</span> emergency
+              </StatPill>
+            )}
+            {stats.urgent > 0 && (
+              <StatPill color="var(--color-urgency-urgent)">
+                <span className="tabular-nums">{stats.urgent}</span> urgent
+              </StatPill>
+            )}
+          </div>
+        )}
       </header>
 
       {queueLoading ? (
@@ -69,6 +88,27 @@ export function QueuePage() {
         </ul>
       )}
     </div>
+  );
+}
+
+// A small queue stat. Neutral by default; pass an urgency color to tint it (a soft fill plus a
+// matching dot) so emergency/urgent counts read at a glance without shouting.
+function StatPill({ color, children }: { color?: string; children: React.ReactNode }) {
+  if (!color) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1 text-sm font-semibold text-ink">
+        {children}
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold"
+      style={{ color, backgroundColor: `color-mix(in srgb, ${color} 12%, white)` }}
+    >
+      <span className="size-1.5 rounded-full" style={{ backgroundColor: color }} />
+      {children}
+    </span>
   );
 }
 
