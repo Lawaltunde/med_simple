@@ -11,6 +11,7 @@ import com.medsimple.careplan.entity.CareSuggestionStatus;
 import com.medsimple.careplan.repository.CareSuggestionRepository;
 import com.medsimple.careplan.service.OrderSuggestionGuardrail;
 import com.medsimple.careplan.service.SuggestionGuardrail;
+import com.medsimple.shared.exception.BusinessRuleException;
 import com.medsimple.shared.privacy.SymptomRedactor;
 import com.medsimple.symptom.dto.EpisodeResponse;
 import com.medsimple.symptom.dto.SubmissionResponse;
@@ -103,7 +104,7 @@ public class AiTriageService {
                 .map(symptomRedactor::redact)
                 .toList();
         if (symptoms.isEmpty()) {
-            throw new IllegalStateException("No completed submissions found for episode " + episodeId);
+            throw new BusinessRuleException("No completed submissions found for episode " + episodeId);
         }
 
         // Keyword RAG: retrieve physician-approved plans for similar presentations (consented

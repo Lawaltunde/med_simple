@@ -110,7 +110,7 @@ class ReferralServiceTest {
 
         assertThatThrownBy(() -> referralService.createReferral(
                 new CreateReferralRequest(episode.getId(), "chest pain", ReferralUrgency.ROUTINE), null))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(com.medsimple.shared.exception.BusinessRuleException.class);
         verify(referralRepository, never()).save(any());
         verifyNoInteractions(specialtySuggestionDao);
     }

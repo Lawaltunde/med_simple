@@ -204,7 +204,7 @@ class AiTriageServiceTest {
                 .thenReturn(List.of(pending));
 
         assertThatThrownBy(() -> aiTriageService.triageEpisode(episodeId))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(com.medsimple.shared.exception.BusinessRuleException.class)
                 .hasMessageContaining("No completed submissions");
     }
 

@@ -94,7 +94,7 @@ class AppointmentServiceTest {
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
 
         assertThatThrownBy(() -> appointmentService.createAppointment(request, null))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(com.medsimple.shared.exception.BusinessRuleException.class);
         verify(appointmentRepository, never()).save(any());
     }
 
