@@ -343,9 +343,52 @@ One feature per branch. Branch naming: `feature/<short-description>`.
 
 ## Roadmap
 
-| Phase | Scope | Status |
-|---|---|---|
-| 0 — POC | Live AI intake, triage queue, physician summaries, dual-path prescription and lab | Complete |
-| 1 — Pilot | Production build; PHIPA-compliant hosting; voice + photo intake; 2–3 pilot clinics on fallback paths | In progress |
-| 2 — Integration | PrescribeIT; Ocean eReferral; lab booking; FHIR EMR connectivity | Planned |
-| 3 — Intelligence | Medical-device licensing for elevated AI: autonomous triage assistance, AI-drafted prescriptions under physician review | Future |
+Phase 0 is complete and verified end to end. Three phases remain. The codebase already
+over-delivers on parts of Phases 1–2 — voice + photo intake is live, and the real-adapter seams
+for PrescribeIT, Ocean eReferral, and lab booking are scaffolded behind their fallbacks — so the
+remaining work is increasingly operational and regulatory rather than greenfield engineering.
+
+| Phase | Timeframe | Focus | Status |
+|---|---|---|---|
+| 0 — POC | — | Proven core loop and architecture | ✅ Complete |
+| 1 — Pilot | Months 1–6 | Production build, real clinics on fallback paths | 🚧 In progress |
+| 2 — Integration | Months 6–18 | Live national/provincial rails behind the same workflows | ◻️ Planned |
+| 3 — Intelligence | Months 18+ | Elevated AI through the medical-device licensing pathway | ◻️ Future |
+
+### Phase 1 — Pilot (months 1–6)
+
+Real-world validation on the existing fallback-first build, with no integration prerequisites.
+
+- Production build on the Java/FHIR stack; PHIPA-compliant, Canadian-resident hosting.
+- Secrets and config moved to a managed secret store; security assessment before pilot.
+- Voice transcription and photo intake live. ✅ _(shipped in the POC)_
+- Onboard 2–3 pilot clinics (walk-in networks first) on fallback paths only.
+- Surface the physician-override and outcome instrumentation as a dataset / report.
+
+**Outcome:** real-world validation data, the physician-override dataset, and clinic testimonials.
+
+### Phase 2 — Integration (months 6–18)
+
+Same workflows, faster rails. Each integration is an adapter swap, not a re-architecture — the
+seams already exist behind every fallback.
+
+- PrescribeIT vendor onboarding (e-prescribing).
+- Ocean eReferral (Ontario) for electronic referrals.
+- First laboratory booking + results integration.
+- EMR connectivity via FHIR, read/write where the clinic's system allows.
+- Follow-up and reminder automation at scale.
+- **Structured clarification / eConsult** — a scoped, audited message thread on a referral or
+  requisition so a diagnostic centre or specialist can ask a question (or send advice) without a
+  full visit, with the AI summarizing the thread. Maps onto Ontario eConsult and Ocean messaging.
+
+**Outcome:** the same workflows on faster rails, plus a defensible integration moat.
+
+### Phase 3 — Intelligence (months 18+)
+
+The full original vision, achieved through the approval pathway rather than around it.
+
+- Pursue Health Canada medical-device licensing for elevated AI functions.
+- Autonomous triage assistance and AI-drafted prescriptions under physician review.
+- Backed by the validation evidence (override logs, outcomes) accumulated from Phase 1 onward.
+
+**Outcome:** the full original vision, licensed and defensible.
