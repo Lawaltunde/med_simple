@@ -23,6 +23,7 @@ import com.medsimple.media.exception.UnsupportedMediaTypeException;
 import com.medsimple.notification.exception.NotificationNotFoundException;
 import com.medsimple.referral.exception.InvalidReferralStateException;
 import com.medsimple.referral.exception.ReferralNotFoundException;
+import com.medsimple.shared.exception.BusinessRuleException;
 import com.medsimple.symptom.exception.EpisodeNotFoundException;
 import com.medsimple.patient.exception.EmailAlreadyInUseException;
 import com.medsimple.patient.exception.InvalidHealthCardException;
@@ -37,6 +38,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.Instant;
 import java.util.stream.Collectors;
@@ -67,10 +69,18 @@ public class GlobalExceptionHandler {
                 .body(new ApiError(413, "PAYLOAD_TOO_LARGE", ex.getMessage(), Instant.now()));
     }
 
-    @ExceptionHandler({InvalidPrescriptionStateException.class, InvalidReferralStateException.class, InvalidRequisitionStateException.class, InvalidSuggestionStateException.class})
+    @ExceptionHandler({InvalidPrescriptionStateException.class, InvalidReferralStateException.class, InvalidRequisitionStateException.class, InvalidSuggestionStateException.class, BusinessRuleException.class})
     public ResponseEntity<ApiError> handleInvalidState(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ApiError(409, "INVALID_STATE", ex.getMessage(), Instant.now()));
+    }
+
+    // Unknown route / missing static resource. Without this it falls through to the catch-all and
+    // surfaces as a 500; an unmatched path is a 404.
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiError> handleNoResource(NoResourceFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ApiError(404, "NOT_FOUND", "No endpoint " + ex.getResourcePath(), Instant.now()));
     }
 
     // PHIPA gate violation — the patient asked for a result that is not yet released.

@@ -144,7 +144,7 @@ class CarePlanServiceTest {
 
         assertThatThrownBy(() -> carePlanService.createCarePlan(
                 new CreateCarePlanRequest(episodeId, physicianId, null), null))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(com.medsimple.shared.exception.BusinessRuleException.class)
                 .hasMessageContaining("no assigned clinic");
     }
 

@@ -7,6 +7,7 @@ import com.medsimple.appointment.exception.AppointmentNotFoundException;
 import com.medsimple.appointment.repository.AppointmentRepository;
 import com.medsimple.audit.service.AuditService;
 import com.medsimple.auth.security.AccessGuard;
+import com.medsimple.shared.exception.BusinessRuleException;
 import com.medsimple.notification.entity.NotificationType;
 import com.medsimple.notification.service.NotificationService;
 import com.medsimple.patient.exception.PatientNotFoundException;
@@ -44,7 +45,7 @@ public class AppointmentService {
         SymptomEpisode episode = episodeRepository.findById(request.episodeId())
                 .orElseThrow(() -> new EpisodeNotFoundException(request.episodeId()));
         if (episode.getAssignedClinic() == null) {
-            throw new IllegalStateException(
+            throw new BusinessRuleException(
                     "Episode " + request.episodeId() + " has no assigned clinic; cannot book an appointment");
         }
         User physician = userRepository.findByIdAndRole(request.physicianId(), UserRole.PHYSICIAN)

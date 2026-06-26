@@ -115,7 +115,7 @@ class DiagnosticServiceTest {
 
         assertThatThrownBy(() -> diagnosticService.createRequisition(
                 new CreateRequisitionRequest(episode.getId(), "CBC", null, null, RequisitionUrgency.ROUTINE), null))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(com.medsimple.shared.exception.BusinessRuleException.class);
         verify(requisitionRepository, never()).save(any());
     }
 
