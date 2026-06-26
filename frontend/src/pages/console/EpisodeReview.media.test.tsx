@@ -53,6 +53,7 @@ vi.mock("@/features/careplan/hooks", () => ({
 vi.mock("@/features/prescription/PrescriptionCard", () => ({ PrescriptionCard: () => null }));
 vi.mock("@/features/diagnostic/DiagnosticCard", () => ({ DiagnosticCard: () => null }));
 vi.mock("@/features/referral/ReferralCard", () => ({ ReferralCard: () => null }));
+vi.mock("@/features/wearable/WearableSummaryCard", () => ({ WearableSummaryCard: () => null }));
 vi.mock("@/features/appointment/BookAppointmentCard", () => ({ BookAppointmentCard: () => null }));
 
 beforeEach(() => {
