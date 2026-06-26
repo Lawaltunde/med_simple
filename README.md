@@ -18,7 +18,7 @@ Patients submit symptoms as they occur. An AI engine consolidates them, assigns 
 
 ## Architecture
 
-**Package-by-feature with N-tier layers.** Each domain module (clinic, patient, symptom, careplan, prescription, diagnostic, referral, notification, audit, ai) is self-contained with its own entity, DTO, repository, service, and controller. Services communicate via dependency injection. DAO interfaces are used wherever multiple implementations exist — real adapter and fallback adapter implementing the same interface.
+**Package-by-feature with N-tier layers.** Each domain module (patient, clinic, symptom, media, ai, careplan, prescription, diagnostic, referral, appointment, wearable, physician, notification, auth, audit) is self-contained, layered into `entity` / `dto` / `dao` / `repository` / `service` / `controller` subpackages. Services communicate via dependency injection. DAO interfaces are used wherever multiple implementations exist — a real adapter and a fallback adapter implementing the same interface.
 
 **Fallback-first design.** Every external integration ships with a built-in fallback that works with zero third-party connectivity:
 
@@ -42,6 +42,7 @@ A per-clinic capability registry (`clinic_capabilities` table) resolves which im
 | `referrals` | ServiceRequest (intent = referral) |
 | `diagnostic_requisitions` | ServiceRequest |
 | `diagnostic_results` | DiagnosticReport |
+| `wearable_readings` | Observation (vital-signs / activity, patient-generated) |
 
 ---
 
@@ -55,7 +56,7 @@ A per-clinic capability registry (`clinic_capabilities` table) resolves which im
 | Database | PostgreSQL 16 |
 | Schema migrations | Flyway |
 | Testing | JUnit 5, Mockito |
-| Frontend | React (built output served from `src/main/resources/static`) |
+| Frontend | React + TypeScript + Vite + Tailwind (built output served from `src/main/resources/static`) |
 | Local dev database | Docker Compose (PostgreSQL 16) |
 | Staging / production database | Supabase (PostgreSQL, Storage, Realtime) |
 
@@ -63,113 +64,33 @@ A per-clinic capability registry (`clinic_capabilities` table) resolves which im
 
 ## Project Structure
 
+Package-by-feature under `src/main/java/com/medsimple/`. Each module is layered into
+`entity` / `dto` / `dao` / `repository` / `service` / `controller` (and `exception`) subpackages.
+External integrations sit behind a `dao` interface with a real adapter and a fallback adapter.
+
 ```
-src/
-├── main/
-│   ├── java/com/medsimple/
-│   │   ├── clinic/
-│   │   │   ├── Clinic.java
-│   │   │   ├── ClinicCapability.java
-│   │   │   ├── ClinicDto.java
-│   │   │   ├── ClinicRepository.java
-│   │   │   ├── ClinicService.java
-│   │   │   ├── ClinicController.java
-│   │   │   └── exception/
-│   │   ├── patient/
-│   │   │   ├── Patient.java
-│   │   │   ├── PatientProfile.java
-│   │   │   ├── PatientHealthCoverage.java
-│   │   │   ├── PatientClinicRegistration.java
-│   │   │   ├── PatientConsent.java
-│   │   │   ├── PatientDto.java
-│   │   │   ├── PatientRepository.java
-│   │   │   ├── PatientService.java
-│   │   │   ├── PatientController.java
-│   │   │   └── exception/
-│   │   ├── symptom/
-│   │   │   ├── SymptomEpisode.java
-│   │   │   ├── SymptomSubmission.java
-│   │   │   ├── SymptomDto.java
-│   │   │   ├── SymptomEpisodeRepository.java
-│   │   │   ├── SymptomSubmissionRepository.java
-│   │   │   ├── SymptomService.java
-│   │   │   ├── SymptomController.java
-│   │   │   └── exception/
-│   │   ├── careplan/
-│   │   │   ├── CarePlan.java
-│   │   │   ├── FollowUp.java
-│   │   │   ├── CarePlanDto.java
-│   │   │   ├── CarePlanRepository.java
-│   │   │   ├── FollowUpRepository.java
-│   │   │   ├── CarePlanService.java
-│   │   │   ├── CarePlanController.java
-│   │   │   └── exception/
-│   │   ├── prescription/
-│   │   │   ├── Prescription.java
-│   │   │   ├── Pharmacy.java
-│   │   │   ├── PrescriptionDto.java
-│   │   │   ├── PrescriptionRepository.java
-│   │   │   ├── PharmacyRepository.java
-│   │   │   ├── PrescriptionDeliveryDao.java      (interface)
-│   │   │   ├── PrescribItDeliveryService.java
-│   │   │   ├── PdfPrescriptionDeliveryService.java
-│   │   │   ├── PrescriptionService.java
-│   │   │   ├── PrescriptionController.java
-│   │   │   └── exception/
-│   │   ├── diagnostic/
-│   │   │   ├── DiagnosticRequisition.java
-│   │   │   ├── DiagnosticResult.java
-│   │   │   ├── DiagnosticCentre.java
-│   │   │   ├── DiagnosticDto.java
-│   │   │   ├── DiagnosticRequisitionRepository.java
-│   │   │   ├── DiagnosticResultRepository.java
-│   │   │   ├── DiagnosticCentreRepository.java
-│   │   │   ├── DiagnosticDeliveryDao.java         (interface)
-│   │   │   ├── ElectronicRequisitionService.java
-│   │   │   ├── PrintableRequisitionService.java
-│   │   │   ├── DiagnosticService.java
-│   │   │   ├── DiagnosticController.java
-│   │   │   └── exception/
-│   │   ├── referral/
-│   │   │   ├── Referral.java
-│   │   │   ├── ReferralDto.java
-│   │   │   ├── ReferralRepository.java
-│   │   │   ├── ReferralDeliveryDao.java            (interface)
-│   │   │   ├── OceanReferralService.java
-│   │   │   ├── PdfReferralService.java
-│   │   │   ├── ReferralService.java
-│   │   │   ├── ReferralController.java
-│   │   │   └── exception/
-│   │   ├── ai/
-│   │   │   ├── AiService.java
-│   │   │   ├── UrgencyAssessmentService.java
-│   │   │   ├── ClinicalSummaryService.java
-│   │   │   └── SafetyCheckService.java
-│   │   ├── notification/
-│   │   │   ├── Notification.java
-│   │   │   ├── NotificationDto.java
-│   │   │   ├── NotificationRepository.java
-│   │   │   ├── NotificationDao.java               (interface)
-│   │   │   ├── EmailNotificationService.java
-│   │   │   ├── InAppNotificationService.java
-│   │   │   ├── NotificationService.java
-│   │   │   └── exception/
-│   │   ├── audit/
-│   │   │   ├── AuditLog.java
-│   │   │   ├── AuditLogRepository.java
-│   │   │   └── AuditService.java
-│   │   ├── auth/                                  (implemented in later PR)
-│   │   ├── config/
-│   │   └── shared/
-│   └── resources/
-│       ├── application.properties
-│       ├── db/
-│       │   └── migration/
-│       │       └── V1__init_schema.sql
-│       ├── static/                                (React production build)
-│       └── templates/
-└── test/
-    └── java/com/medsimple/                        (mirrors main structure)
+src/main/java/com/medsimple/
+├── patient/        Patients, profiles, health coverage, clinic registration, consent
+├── clinic/         Clinics, capability registry, staff, physician credentialing
+├── symptom/        Symptom episodes and submissions (text / voice / photo)
+├── media/          Voice/photo storage, transcription + vision adapters, processing poller
+├── ai/             Triage, clinical summary, keyword RAG, patient symptom chat
+├── careplan/       Care plans, AI care suggestions, follow-ups
+├── prescription/   Prescription authoring, AI safety checks, PrescribeIT + PDF delivery
+├── diagnostic/     Requisitions, results, patient-release gate, lab + printable delivery
+├── referral/       AI-assisted referral triage, Ocean eReferral + PDF delivery
+├── appointment/    Visit / follow-up scheduling, .ics calendar export
+├── wearable/       Patient-generated vitals as FHIR Observations, sync + manual ingest
+├── physician/      Triage queue, episode assignment, urgency confirmation
+├── notification/   Email + in-app notifications
+├── auth/           Spring Security, JWT, refresh tokens, access guard
+├── audit/          Immutable PHIPA audit log
+├── config/         Cross-cutting configuration and the global exception handler
+└── shared/         Crypto, PHI redaction, common entities and exceptions
+
+src/main/resources/db/migration/   Flyway migrations (V{n}__{description}.sql)
+frontend/                          React + TypeScript + Vite app (built into resources/static)
+src/test/java/com/medsimple/       Tests mirroring the main package structure
 ```
 
 ---
@@ -241,7 +162,8 @@ Spring JPA is configured with `ddl-auto=none`. Flyway is the sole owner of schem
 | `clinics` | Tenant root — one row per clinic customer |
 | `clinic_capabilities` | Per-clinic adapter registry (PrescribeIT, Ocean, etc.) |
 | `users` | All actors: patients, physicians, nurses, admins |
-| `clinic_staff` | Maps physician/staff users to clinic with role and license |
+| `refresh_tokens` | Hashed JWT refresh tokens for session continuity |
+| `clinic_staff` | Maps physician/staff users to clinic with role, license, and credential-verification state |
 | `pharmacies` | Pharmacy directory with electronic-Rx flag |
 | `diagnostic_centres` | Diagnostic centre directory with electronic-booking flag |
 | `patient_profiles` | DOB, allergies, current medications, preferred pharmacy |
@@ -250,12 +172,15 @@ Spring JPA is configured with `ddl-auto=none`. Flyway is the sole owner of schem
 | `patient_consents` | Versioned consent records — immutable append-only |
 | `symptom_episodes` | One episode per complaint; AI urgency, summary, and physician confirmation |
 | `symptom_submissions` | Individual entries (text/voice/photo) accumulating into an episode |
+| `care_suggestions` | AI's advisory plan of care (PROPOSED), reviewed into a signed care plan by the physician |
 | `care_plans` | Physician's response plan; owns all prescriptions, requisitions, referrals |
 | `follow_ups` | Physician-patient messages and AI-monitoring-generated prompts |
+| `appointments` | Scheduled visits / follow-ups; `.ics` calendar export |
 | `prescriptions` | FHIR MedicationRequest — dual delivery path |
 | `referrals` | AI-assisted specialty referral — dual delivery path |
 | `diagnostic_requisitions` | FHIR ServiceRequest — dual delivery path |
 | `diagnostic_results` | FHIR DiagnosticReport — released to patient after physician interpretation |
+| `wearable_readings` | Patient-generated vitals (HR, steps, sleep, SpO2) as FHIR Observations, with source/provenance |
 | `notifications` | Email and in-app alerts with delivery and read tracking |
 | `audit_logs` | Immutable PHIPA-required trail of every PHI access and state change |
 
@@ -275,6 +200,8 @@ Spring JPA is configured with `ddl-auto=none`. Flyway is the sole owner of schem
 - Access own test results alongside physician's interpretation
 - Follow-up communication with physician through the app
 - AI-generated prompts to report symptom updates during ongoing care
+- Connect a wearable / phone health source (heart rate, steps, sleep, SpO2); view trends on the Vitals & activity page
+- Patient symptom assistant chat: general, non-diagnostic guidance with a clinician always in the loop
 
 ### Physician
 
@@ -289,6 +216,7 @@ Spring JPA is configured with `ddl-auto=none`. Flyway is the sole owner of schem
 - Follow-up messages to patients; AI monitors care plan and escalates if patient reports deterioration or misses a critical step
 - Results returned with AI structured summary; physician adds final clinical interpretation
 - Results released to patient with physician interpretation layered on top
+- Wearable vitals summary on the episode review (read-only, labeled consumer-grade, shown only when the patient has shared data)
 
 ### AI
 
@@ -313,6 +241,7 @@ Designed for PHIPA (Ontario) and PIPEDA compliance from the first migration:
 - **Versioned consent** — every patient consent event recorded with type, version, timestamp, and IP in `patient_consents`; rows are immutable
 - **AI de-identification** — PHI stripped or tokenized before any data is sent to AI model providers
 - **Clinician-in-the-loop** — every AI urgency assessment requires physician confirmation or override; override logging builds the validation evidence base for future regulatory submissions
+- **Patient-generated data labeled** — consumer wearable data is stored and shown as patient-generated (consumer-grade) with device provenance, consent-gated and informational only; the platform never makes an autonomous clinical determination on it
 
 Health Canada classification: the platform launches as a clinical communication and documentation tool. All clinical decisions (urgency confirmation, referral, prescription, result interpretation) are made by a physician. AI functions requiring device classification (autonomous triage, AI-drafted prescriptions) are Phase 3, pursued through the proper licensing pathway.
 
@@ -320,24 +249,15 @@ Health Canada classification: the platform launches as a clinical communication 
 
 ## Branch and PR Strategy
 
-One feature per branch. Branch naming: `feature/<short-description>`.
+One logical change per branch (`feature/<name>`, `fix/<name>`, or `docs/<name>`), one PR per
+branch, merged to `main` after review. Each change ships with its tests in the same PR. The
+authoritative history is the merged PRs on GitHub.
 
-| PR | Branch | Scope |
-|---|---|---|
-| 1 | `feature/db-schema` | Flyway V1 initial schema, pom.xml foundation |
-| 2 | `feature/patient-module` | Patient entity, profile, health coverage, clinic registration |
-| 3 | `feature/clinic-module` | Clinic entity, capabilities, staff management |
-| 4 | `feature/symptom-capture` | Symptom episode and submission API (text input) |
-| 5 | `feature/ai-triage` | Spring AI urgency assessment and clinical summary |
-| 6 | `feature/physician-queue` | Triage queue endpoint, urgency override |
-| 7 | `feature/voice-photo-intake` | Voice transcription, photo upload, async processing |
-| 8 | `feature/care-plan` | Care plan creation, follow-up messaging |
-| 9 | `feature/prescription-workflow` | Prescription authoring, AI safety checks, PDF fallback |
-| 10 | `feature/referral-workflow` | Referral creation, specialty suggestion, PDF fallback |
-| 11 | `feature/diagnostic-workflow` | Requisition, booking, result loop |
-| 12 | `feature/notifications` | Email and in-app dual-channel delivery |
-| 13 | `feature/auth` | Spring Security, JWT, token management |
-| 14 | `feature/react-frontend` | React app wired to REST API |
+The POC was built bottom-up: schema → patient and clinic → symptom capture → AI triage →
+physician queue → care plan → prescription, referral, and diagnostic loops → notifications → auth →
+React frontend. Subsequent PRs added voice and photo intake, the patient symptom chat, Ontario
+health-card and physician-credential verification, FHIR R4 lab requisitions, and wearable
+integration.
 
 ---
 
