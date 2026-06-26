@@ -380,6 +380,19 @@ seams already exist behind every fallback.
 - **Structured clarification / eConsult** — a scoped, audited message thread on a referral or
   requisition so a diagnostic centre or specialist can ask a question (or send advice) without a
   full visit, with the AI summarizing the thread. Maps onto Ontario eConsult and Ocean messaging.
+- **Wearable / device integration** — the patient connects a watch or phone health source (heart
+  rate, steps, sleep, SpO2) through a wearable aggregator, with manual entry as the fallback. Data
+  lands as labeled FHIR `Observation` resources (patient-generated, consumer-grade provenance),
+  shown as trends in the patient and physician consoles and folded into the AI's physician-facing
+  summary. **Informational only:** the platform displays and summarizes the data for the physician;
+  it never makes an autonomous clinical determination or alert on vitals. Active monitoring with
+  automated clinical escalation is a regulated device function and is sequenced to Phase 3.
+- **Administrative voice outreach** — an AI voice agent for non-clinical calls only (appointment
+  reminders, "results are ready," booking and medication-pickup nudges, "the clinic is trying to
+  reach you"). It speaks clinic-approved scripts, always discloses it is the clinic's automated
+  assistant, always offers a human callback, and immediately routes any clinical cue or emergency
+  to a human or 911. It is a new channel behind the existing notification port, with email and
+  in-app as the fallback. The autonomous, clinical-conversation version is Phase 3.
 
 **Outcome:** the same workflows on faster rails, plus a defensible integration moat.
 
@@ -389,6 +402,12 @@ The full original vision, achieved through the approval pathway rather than arou
 
 - Pursue Health Canada medical-device licensing for elevated AI functions.
 - Autonomous triage assistance and AI-drafted prescriptions under physician review.
+- **Autonomous clinical voice agent** — calls that convey clinical content on the physician's
+  behalf and learn from physician interactions (a learning device function under Health Canada's
+  ML-Enabled Medical Devices guidance). The Phase 2 voice agent is strictly administrative; this is
+  its licensed clinical successor.
+- **Active wearable monitoring** — continuous vitals monitoring with automated clinical escalation,
+  building on the informational wearable feed from Phase 2.
 - Backed by the validation evidence (override logs, outcomes) accumulated from Phase 1 onward.
 
 **Outcome:** the full original vision, licensed and defensible.
