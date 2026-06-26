@@ -1,6 +1,12 @@
 import { api } from "@/lib/api";
 
-export type ConsentType = "DATA_PROCESSING" | "AI_ANALYSIS" | "PHI_SHARING" | "MARKETING" | "AI_TRAINING";
+export type ConsentType =
+  | "DATA_PROCESSING"
+  | "AI_ANALYSIS"
+  | "PHI_SHARING"
+  | "MARKETING"
+  | "AI_TRAINING"
+  | "WEARABLE_DATA";
 
 // Mirrors ConsentResponse. The consent log is append-only: each grant/revoke is a new row,
 // newest first, so the first entry for a type is the current state.
