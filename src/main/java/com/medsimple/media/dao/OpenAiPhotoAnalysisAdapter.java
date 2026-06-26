@@ -32,6 +32,11 @@ public class OpenAiPhotoAnalysisAdapter implements PhotoAnalysisDao {
             advise treatment. Two or three sentences.
             """;
 
+    // GPT-4o vision fails intermittently on valid images (timeout / rate-limit / 5xx); an
+    // immediate retry clears it. Three attempts with 250ms→500ms backoff before the fallback.
+    private static final int MAX_ATTEMPTS = 3;
+    private static final long BASE_BACKOFF_MILLIS = 250L;
+
     private final ChatClient chatClient;
     private final MediaStorageDao mediaStorage;
 
@@ -43,15 +48,18 @@ public class OpenAiPhotoAnalysisAdapter implements PhotoAnalysisDao {
     @Override
     public String analyze(String mediaUrl) {
         try {
-            MediaContent media = mediaStorage.resolve(mediaUrl);
-            MimeType mimeType = MimeTypeUtils.parseMimeType(media.contentType());
-            return chatClient.prompt()
-                    .user(u -> u.text(PROMPT).media(mimeType, media.resource()))
-                    .call()
-                    .content();
+            return MediaModelRetry.withRetry("OpenAI photo analysis", MAX_ATTEMPTS, BASE_BACKOFF_MILLIS,
+                    () -> {
+                        MediaContent media = mediaStorage.resolve(mediaUrl);
+                        MimeType mimeType = MimeTypeUtils.parseMimeType(media.contentType());
+                        return chatClient.prompt()
+                                .user(u -> u.text(PROMPT).media(mimeType, media.resource()))
+                                .call()
+                                .content();
+                    });
         } catch (Exception e) {
-            // Log the failure, not the media or any identifier.
-            log.error("OpenAI photo analysis failed; falling back to clinician review note", e);
+            // Every attempt failed. Log the failure, not the media or any identifier.
+            log.error("OpenAI photo analysis failed after retries; falling back to clinician review note", e);
             return "[Photo received. Automatic analysis failed; a clinician will review the image.]";
         }
     }
