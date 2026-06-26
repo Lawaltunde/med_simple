@@ -19,6 +19,7 @@ import { FollowUpThread } from "@/features/careplan/FollowUpThread";
 import { PrescriptionCard } from "@/features/prescription/PrescriptionCard";
 import { DiagnosticCard } from "@/features/diagnostic/DiagnosticCard";
 import { ReferralCard } from "@/features/referral/ReferralCard";
+import { WearableSummaryCard } from "@/features/wearable/WearableSummaryCard";
 import { BookAppointmentCard } from "@/features/appointment/BookAppointmentCard";
 import { AuthedMedia } from "@/features/media/AuthedMedia";
 import { Button } from "@/components/ui/button";
@@ -97,6 +98,7 @@ export function EpisodeReview() {
           </section>
 
           <AssignCard episode={episode} episodeId={id} />
+          <WearableSummaryCard patientId={episode.patientId} />
           <ConfirmUrgencyCard episode={episode} episodeId={id} />
           <CarePlanCard episode={episode} episodeId={id} />
           {/* Workstream slots — each renders null until its branch lands. */}

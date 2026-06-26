@@ -14,6 +14,7 @@ import { CarePlanDetail } from "@/pages/patient/CarePlanDetail";
 import { NotificationsPage } from "@/pages/patient/NotificationsPage";
 import { PrescriptionsPage } from "@/pages/patient/PrescriptionsPage";
 import { ResultsPage } from "@/pages/patient/ResultsPage";
+import { VitalsPage } from "@/pages/patient/VitalsPage";
 import { ReferralsPage } from "@/pages/patient/ReferralsPage";
 import { PrivacyPage } from "@/pages/patient/PrivacyPage";
 import { AppointmentsPage } from "@/pages/patient/AppointmentsPage";
@@ -56,6 +57,7 @@ export function App() {
                 workstream replaces its page body on its own branch. */}
             <Route path="prescriptions" element={<PrescriptionsPage />} />
             <Route path="results" element={<ResultsPage />} />
+            <Route path="vitals" element={<VitalsPage />} />
             <Route path="referrals" element={<ReferralsPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="privacy" element={<PrivacyPage />} />
