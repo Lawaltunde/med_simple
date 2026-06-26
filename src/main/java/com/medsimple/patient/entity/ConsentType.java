@@ -8,5 +8,8 @@ public enum ConsentType {
     // Secondary use: allow this patient's de-identified care data to improve the AI
     // (eval sets, retrieval examples). Distinct from AI_ANALYSIS, which is consent to have
     // the AI assist with their own care.
-    AI_TRAINING
+    AI_TRAINING,
+    // Consent to connect a wearable / device health source and share the readings with the
+    // patient's clinic. Required before any wearable data is ingested or displayed.
+    WEARABLE_DATA
 }
