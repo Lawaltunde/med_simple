@@ -25,6 +25,10 @@ export interface CurrentUser {
 }
 
 // Clinic staff use the console; patients use the patient app.
+// Patients use the patient app, clinic administrators use the admin console, and clinical staff
+// (physicians, nurses, receptionists) use the clinician console.
 export function homePathForRole(role: UserRole): string {
-  return role === "PATIENT" ? "/app" : "/console";
+  if (role === "PATIENT") return "/app";
+  if (role === "CLINIC_ADMIN" || role === "SUPER_ADMIN") return "/admin";
+  return "/console";
 }

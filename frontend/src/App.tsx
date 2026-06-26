@@ -23,9 +23,13 @@ import { ConsoleApp } from "@/pages/console/ConsoleApp";
 import { QueuePage } from "@/pages/console/QueuePage";
 import { EpisodeReview } from "@/pages/console/EpisodeReview";
 import { ConsoleAppointmentsPage } from "@/pages/console/ConsoleAppointmentsPage";
+import { AdminApp } from "@/pages/admin/AdminApp";
+import { StaffPage } from "@/pages/admin/StaffPage";
+import { IntegrationsPage } from "@/pages/admin/IntegrationsPage";
 
-// Clinic staff roles that may enter the console.
-const STAFF_ROLES = ["PHYSICIAN", "NURSE", "RECEPTIONIST", "CLINIC_ADMIN", "SUPER_ADMIN"] as const;
+// Clinical staff use the console; clinic administrators use the admin console.
+const CLINICAL_ROLES = ["PHYSICIAN", "NURSE", "RECEPTIONIST"] as const;
+const ADMIN_ROLES = ["CLINIC_ADMIN", "SUPER_ADMIN"] as const;
 
 export function App() {
   return (
@@ -69,7 +73,7 @@ export function App() {
           <Route
             path="/console"
             element={
-              <ProtectedRoute allow={[...STAFF_ROLES]}>
+              <ProtectedRoute allow={[...CLINICAL_ROLES]}>
                 <ConsoleApp />
               </ProtectedRoute>
             }
@@ -77,6 +81,20 @@ export function App() {
             <Route index element={<QueuePage />} />
             <Route path="episodes/:id" element={<EpisodeReview />} />
             <Route path="appointments" element={<ConsoleAppointmentsPage />} />
+            <Route path="*" element={<ComingSoon title="This page" description="That section isn't available yet." />} />
+          </Route>
+
+          {/* Clinic admin console (authenticated, CLINIC_ADMIN / SUPER_ADMIN) */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute allow={[...ADMIN_ROLES]}>
+                <AdminApp />
+              </ProtectedRoute>
+            }
+          >
+            <Route index element={<StaffPage />} />
+            <Route path="integrations" element={<IntegrationsPage />} />
             <Route path="*" element={<ComingSoon title="This page" description="That section isn't available yet." />} />
           </Route>
 
