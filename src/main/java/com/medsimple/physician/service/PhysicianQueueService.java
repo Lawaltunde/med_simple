@@ -1,13 +1,16 @@
 package com.medsimple.physician.service;
 
 import com.medsimple.audit.service.AuditService;
+import com.medsimple.clinic.entity.VerificationStatus;
 import com.medsimple.clinic.exception.ClinicNotFoundException;
 import com.medsimple.clinic.repository.ClinicRepository;
+import com.medsimple.clinic.repository.ClinicStaffRepository;
 import com.medsimple.patient.exception.PatientNotFoundException;
 import com.medsimple.patient.repository.PatientRepository;
 import com.medsimple.physician.dto.ConfirmUrgencyRequest;
 import com.medsimple.physician.dto.QueueEntryResponse;
 import com.medsimple.shared.entity.User;
+import com.medsimple.shared.exception.BusinessRuleException;
 import com.medsimple.shared.entity.UserRole;
 import com.medsimple.symptom.entity.EpisodeStatus;
 import com.medsimple.symptom.entity.SymptomEpisode;
@@ -43,6 +46,7 @@ public class PhysicianQueueService {
 
     private final SymptomEpisodeRepository episodeRepository;
     private final ClinicRepository clinicRepository;
+    private final ClinicStaffRepository staffRepository;
     private final PatientRepository userRepository;
     private final AuditService auditService;
 
@@ -63,6 +67,11 @@ public class PhysicianQueueService {
         SymptomEpisode episode = findEpisode(episodeId);
         User physician = userRepository.findByIdAndRole(physicianId, UserRole.PHYSICIAN)
                 .orElseThrow(() -> new PatientNotFoundException(physicianId));
+
+        // A physician must be credential-verified before taking a patient. This is the single
+        // chokepoint for the clinical loop: prescribing, referring, and ordering all require the
+        // episode to be assigned, so gating assignment keeps an unverified physician out entirely.
+        requireVerifiedPhysician(physician, episode);
 
         episode.setAssignedPhysician(physician);
         if (episode.getStatus() == EpisodeStatus.AI_ANALYZED
@@ -106,6 +115,19 @@ public class PhysicianQueueService {
     private SymptomEpisode findEpisode(UUID id) {
         return episodeRepository.findById(id)
                 .orElseThrow(() -> new EpisodeNotFoundException(id));
+    }
+
+    // The physician's College registration must be VERIFIED (at the episode's clinic if it has one)
+    // before they can take the patient. UNVERIFIED / PENDING / REJECTED are all blocked.
+    private void requireVerifiedPhysician(User physician, SymptomEpisode episode) {
+        UUID clinicId = episode.getAssignedClinic() != null ? episode.getAssignedClinic().getId() : null;
+        boolean verified = staffRepository.findByUserIdAndActiveTrue(physician.getId()).stream()
+                .filter(s -> clinicId == null || (s.getClinic() != null && clinicId.equals(s.getClinic().getId())))
+                .anyMatch(s -> s.getVerificationStatus() == VerificationStatus.VERIFIED);
+        if (!verified) {
+            throw new BusinessRuleException(
+                    "Physician must be credential-verified before taking patients");
+        }
     }
 
     // Effective urgency = physician-confirmed if present, else AI-assessed.

@@ -5,6 +5,7 @@ import com.medsimple.clinic.entity.Clinic;
 import com.medsimple.clinic.entity.ClinicStaff;
 import com.medsimple.clinic.entity.ClinicType;
 import com.medsimple.clinic.entity.StaffRole;
+import com.medsimple.clinic.entity.VerificationStatus;
 import com.medsimple.clinic.repository.ClinicRepository;
 import com.medsimple.clinic.repository.ClinicStaffRepository;
 import com.medsimple.patient.dto.CreatePatientRequest;
@@ -80,10 +81,15 @@ public class DemoSeedRunner implements ApplicationRunner {
                     .user(physician)
                     .role(StaffRole.PHYSICIAN)
                     .specialization("Family Medicine")
-                    // CPSO credentials captured; starts UNVERIFIED so the verify flow is demoable.
                     .college("CPSO")
                     .registrationNumber("90210")
                     .licenseProvince("ON")
+                    // Seeded VERIFIED so the demo clinical loop works out of the box. Onboarding a
+                    // NEW physician via the admin console starts UNVERIFIED, where the verify flow
+                    // (and the assignment gate) is demoable.
+                    .verificationStatus(VerificationStatus.VERIFIED)
+                    .verificationSource("MANUAL_REVIEW")
+                    .verifiedAt(java.time.OffsetDateTime.now())
                     .active(true)
                     .build());
 
