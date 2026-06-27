@@ -13,7 +13,7 @@ import org.springframework.util.MimeTypeUtils;
 
 /**
  * GPT-4o vision analysis of a patient-submitted photo via Spring AI ChatClient.
- * Active when ai.media.adapter=openai.
+ * Active when ai.photo.adapter=openai.
  *
  * PHI: the mediaUrl is an auth-gated in-platform path (/api/v1/media/{id}), not externally
  * fetchable. The adapter resolves it to the stored bytes via {@link MediaStorageDao} and
@@ -23,7 +23,7 @@ import org.springframework.util.MimeTypeUtils;
 @Slf4j
 @Primary
 @Component
-@ConditionalOnProperty(name = "ai.media.adapter", havingValue = "openai")
+@ConditionalOnProperty(name = "ai.photo.adapter", havingValue = "openai")
 public class OpenAiPhotoAnalysisAdapter implements PhotoAnalysisDao {
 
     private static final String PROMPT = """
