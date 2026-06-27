@@ -1,10 +1,14 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Camera, Mic, MessageSquareText, Loader2, AlertCircle } from "lucide-react";
+import { Camera, Mic, MessageSquareText, Loader2, AlertCircle, ImageOff } from "lucide-react";
 import { useAuth } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { useSubmitSymptomCheck, useSubmitMediaSymptomCheck } from "@/features/symptom/hooks";
+import {
+  useSubmitSymptomCheck,
+  useSubmitMediaSymptomCheck,
+  useTriageEpisode,
+} from "@/features/symptom/hooks";
 import { PhotoCapture } from "@/features/media/PhotoCapture";
 import { VoiceRecorder } from "@/features/media/VoiceRecorder";
 import { ApiError } from "@/lib/api";
@@ -33,21 +37,24 @@ export function NewSymptomCheck() {
 
   const textSubmit = useSubmitSymptomCheck();
   const mediaSubmit = useSubmitMediaSymptomCheck();
+  const triage = useTriageEpisode();
 
   const [description, setDescription] = useState("");
   const [touched, setTouched] = useState(false);
   const [photo, setPhoto] = useState<File | null>(null);
   const [voice, setVoice] = useState<Blob | null>(null);
+  // Set when the AI saw no visible symptom in a photo — the patient decides what to do next.
+  const [needsReview, setNeedsReview] = useState<{ episodeId: string; description: string } | null>(null);
 
   const tooShort = description.trim().length < MIN_CHARS;
-  const pending = textSubmit.isPending || mediaSubmit.isPending;
+  const pending = textSubmit.isPending || mediaSubmit.isPending || triage.isPending;
 
   function switchMode(next: Mode) {
     setMode(next);
     setParams(next === "TEXT" ? {} : { mode: next }, { replace: true });
   }
 
-  function onSuccess(episode: { id: string }) {
+  function goToEpisode(episode: { id: string }) {
     navigate(`/app/episodes/${episode.id}`);
   }
 
@@ -58,22 +65,48 @@ export function NewSymptomCheck() {
     if (mode === "TEXT") {
       setTouched(true);
       if (tooShort) return;
-      textSubmit.mutate({ patientId: user.id, description: description.trim() }, { onSuccess });
+      textSubmit.mutate({ patientId: user.id, description: description.trim() }, { onSuccess: goToEpisode });
       return;
     }
     if (mode === "PHOTO" && photo) {
-      mediaSubmit.mutate({ patientId: user.id, inputType: "PHOTO", blob: photo }, { onSuccess });
+      mediaSubmit.mutate(
+        { patientId: user.id, inputType: "PHOTO", blob: photo },
+        {
+          onSuccess: (result) => {
+            if (result.kind === "needs_review") {
+              setNeedsReview({ episodeId: result.episodeId, description: result.description });
+            } else {
+              goToEpisode(result.episode);
+            }
+          },
+        },
+      );
       return;
     }
     if (mode === "VOICE" && voice) {
-      mediaSubmit.mutate({ patientId: user.id, inputType: "VOICE", blob: voice }, { onSuccess });
+      mediaSubmit.mutate(
+        { patientId: user.id, inputType: "VOICE", blob: voice },
+        { onSuccess: (result) => result.kind === "triaged" && goToEpisode(result.episode) },
+      );
     }
+  }
+
+  // "Send for review anyway" — forward the photo episode to a physician, flagged.
+  function sendForReviewAnyway() {
+    if (!needsReview) return;
+    triage.mutate(needsReview.episodeId, { onSuccess: goToEpisode });
+  }
+
+  // "Choose a different photo" — drop back to the photo picker; the untriaged episode is left as-is.
+  function chooseDifferentPhoto() {
+    setNeedsReview(null);
+    setPhoto(null);
   }
 
   const submitDisabled =
     pending || (mode === "PHOTO" && !photo) || (mode === "VOICE" && !voice);
 
-  const err = textSubmit.error ?? mediaSubmit.error;
+  const err = textSubmit.error ?? mediaSubmit.error ?? triage.error;
   const errorMessage = err instanceof ApiError ? err.message : err ? "Something went wrong. Try again." : null;
 
   const pendingLabel =
@@ -117,6 +150,45 @@ export function NewSymptomCheck() {
         })}
       </div>
 
+      {needsReview ? (
+        <div
+          role="alert"
+          className="space-y-4 rounded-2xl border border-amber-300 bg-amber-50 p-5 text-amber-900"
+        >
+          <div className="flex items-start gap-3">
+            <ImageOff className="mt-0.5 size-5 shrink-0 text-amber-600" />
+            <div>
+              <h3 className="font-bold">We couldn't see a clear symptom in that photo</h3>
+              <p className="mt-1 text-sm text-amber-800">
+                {needsReview.description
+                  ? needsReview.description
+                  : "The image doesn't appear to show a visible medical symptom."}{" "}
+                You can still send it to a physician, or pick a clearer photo.
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={chooseDifferentPhoto}
+              disabled={pending}
+            >
+              Choose a different photo
+            </Button>
+            <Button type="button" className="flex-1" onClick={sendForReviewAnyway} disabled={pending}>
+              {triage.isPending ? (
+                <>
+                  <Loader2 className="size-5 animate-spin" /> Sending…
+                </>
+              ) : (
+                "Send for review anyway"
+              )}
+            </Button>
+          </div>
+        </div>
+      ) : (
       <form onSubmit={onSubmit} className="space-y-5">
         {mode === "TEXT" && (
           <Textarea
@@ -165,6 +237,7 @@ export function NewSymptomCheck() {
           )}
         </Button>
       </form>
+      )}
     </div>
   );
 }

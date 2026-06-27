@@ -1,6 +1,7 @@
 package com.medsimple.media.dto;
 
 import com.medsimple.symptom.entity.InputType;
+import com.medsimple.symptom.entity.MediaRelevance;
 import com.medsimple.symptom.entity.ProcessingStatus;
 
 import java.util.UUID;
@@ -11,5 +12,6 @@ public record ProcessedSubmissionResponse(
         String mediaUrl,
         String transcription,
         String aiAnalysisResult,
+        MediaRelevance aiAnalysisRelevance,
         ProcessingStatus processingStatus
 ) {}

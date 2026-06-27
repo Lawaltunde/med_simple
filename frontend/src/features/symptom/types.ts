@@ -16,6 +16,9 @@ export type UrgencyLevel = "ROUTINE" | "SEE_SOON" | "URGENT" | "EMERGENCY";
 
 export type ProcessingStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
 
+// For a PHOTO: whether the image actually shows a medical symptom. NULL for text/voice.
+export type MediaRelevance = "SYMPTOM_PRESENT" | "NO_SYMPTOM" | "UNSURE";
+
 export interface Submission {
   id: string;
   inputType: InputType;
@@ -23,6 +26,7 @@ export interface Submission {
   mediaUrl: string | null;
   transcription: string | null;
   aiAnalysisResult: string | null;
+  aiAnalysisRelevance: MediaRelevance | null;
   processingStatus: ProcessingStatus;
   submittedAt: string;
 }

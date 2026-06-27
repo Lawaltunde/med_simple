@@ -2,6 +2,7 @@ package com.medsimple.media.dao;
 
 import com.medsimple.media.storage.MediaContent;
 import com.medsimple.media.storage.MediaStorageDao;
+import com.medsimple.symptom.entity.MediaRelevance;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.core.io.ByteArrayResource;
@@ -35,32 +36,41 @@ class OpenAiPhotoAnalysisAdapterTest {
         return new OpenAiPhotoAnalysisAdapter(builder, storage);
     }
 
+    private static PhotoAnalysisResult result(MediaRelevance relevance, String description) {
+        return new PhotoAnalysisResult(relevance, description);
+    }
+
     @Test
     void returnsAnalysis_onFirstSuccess() {
         OpenAiPhotoAnalysisAdapter adapter = newAdapter();
-        when(callSpec.content()).thenReturn("Left forearm with localized redness.");
+        when(callSpec.entity(PhotoAnalysisResult.class))
+                .thenReturn(result(MediaRelevance.SYMPTOM_PRESENT, "Left forearm with localized redness."));
 
-        assertThat(adapter.analyze(URL)).isEqualTo("Left forearm with localized redness.");
-        verify(callSpec, times(1)).content();
+        PhotoAnalysisResult r = adapter.analyze(URL);
+        assertThat(r.relevance()).isEqualTo(MediaRelevance.SYMPTOM_PRESENT);
+        assertThat(r.description()).isEqualTo("Left forearm with localized redness.");
+        verify(callSpec, times(1)).entity(PhotoAnalysisResult.class);
     }
 
     @Test
     void recoversTransientFailure_andReturnsRealAnalysis() {
         OpenAiPhotoAnalysisAdapter adapter = newAdapter();
-        when(callSpec.content())
+        when(callSpec.entity(PhotoAnalysisResult.class))
                 .thenThrow(new RuntimeException("429 Too Many Requests"))
-                .thenReturn("Rash on the cheek.");
+                .thenReturn(result(MediaRelevance.SYMPTOM_PRESENT, "Rash on the cheek."));
 
-        assertThat(adapter.analyze(URL)).isEqualTo("Rash on the cheek.");
-        verify(callSpec, times(2)).content();
+        assertThat(adapter.analyze(URL).description()).isEqualTo("Rash on the cheek.");
+        verify(callSpec, times(2)).entity(PhotoAnalysisResult.class);
     }
 
     @Test
-    void fallsBackToClinicianNote_whenEveryAttemptFails() {
+    void fallsBackToUnsureNote_whenEveryAttemptFails() {
         OpenAiPhotoAnalysisAdapter adapter = newAdapter();
-        when(callSpec.content()).thenThrow(new RuntimeException("persistent failure"));
+        when(callSpec.entity(PhotoAnalysisResult.class)).thenThrow(new RuntimeException("persistent failure"));
 
-        assertThat(adapter.analyze(URL)).contains("Photo").contains("clinician will review");
-        verify(callSpec, times(3)).content();
+        PhotoAnalysisResult r = adapter.analyze(URL);
+        assertThat(r.relevance()).isEqualTo(MediaRelevance.UNSURE); // never silently dropped
+        assertThat(r.description()).contains("Photo").contains("clinician will review");
+        verify(callSpec, times(3)).entity(PhotoAnalysisResult.class);
     }
 }

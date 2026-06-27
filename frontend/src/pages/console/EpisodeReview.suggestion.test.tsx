@@ -15,7 +15,7 @@ const episode: Episode = {
   createdAt: "2026-06-23T11:00:00Z", updatedAt: "2026-06-23T12:00:00Z",
   submissions: [{
     id: "s1", inputType: "TEXT", textContent: "throat hurts", mediaUrl: null,
-    transcription: null, aiAnalysisResult: null, processingStatus: "COMPLETED",
+    transcription: null, aiAnalysisResult: null, aiAnalysisRelevance: null, processingStatus: "COMPLETED",
     submittedAt: "2026-06-23T11:00:00Z",
   }],
 };

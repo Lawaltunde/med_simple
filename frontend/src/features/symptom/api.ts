@@ -29,7 +29,7 @@ function addSubmission(
   });
 }
 
-function triageEpisode(episodeId: string): Promise<Episode> {
+export function triageEpisode(episodeId: string): Promise<Episode> {
   return api<Episode>(`/episodes/${episodeId}/triage`, { method: "POST" });
 }
 
@@ -79,12 +79,25 @@ export interface MediaSymptomCheck {
  * driven explicitly here rather than waiting on the background poller, so the patient sees a
  * triaged result in one flow.
  */
-export async function submitMediaSymptomCheck(input: MediaSymptomCheck): Promise<Episode> {
+// A photo that the AI judged to show no visible symptom is not auto-triaged. The patient is asked
+// whether to send it anyway (then it reaches the physician, flagged) or pick a different photo.
+export type MediaSubmitResult =
+  | { kind: "triaged"; episode: Episode }
+  | { kind: "needs_review"; episodeId: string; description: string };
+
+export async function submitMediaSymptomCheck(input: MediaSymptomCheck): Promise<MediaSubmitResult> {
   const contentType = input.blob.type || (input.inputType === "PHOTO" ? "image/jpeg" : "audio/webm");
   const { mediaUrl } = await uploadMedia(input.blob, filenameFor(contentType));
 
   const episode = await startEpisode(input.patientId, input.clinicId);
   const submission = await addSubmission(episode.id, { inputType: input.inputType, mediaUrl });
-  await processSubmission(submission.id);
-  return triageEpisode(episode.id);
+  const processed = await processSubmission(submission.id);
+
+  // No visible symptom: stop before triage and let the patient decide.
+  if (input.inputType === "PHOTO" && processed.aiAnalysisRelevance === "NO_SYMPTOM") {
+    return { kind: "needs_review", episodeId: episode.id, description: processed.aiAnalysisResult ?? "" };
+  }
+
+  const episodeTriaged = await triageEpisode(episode.id);
+  return { kind: "triaged", episode: episodeTriaged };
 }

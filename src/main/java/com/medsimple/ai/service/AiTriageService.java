@@ -81,11 +81,15 @@ public class AiTriageService {
         if (anyPending) {
             return;
         }
-        // Nothing to triage if no completed submission yielded symptom text (e.g. failed-only media).
-        boolean hasText = submissions.stream()
+        // Don't auto-triage an episode whose only content is a photo with no visible symptom (or a
+        // failed-only media). The patient was asked about it at submission; if they chose to send it
+        // anyway, the explicit triageEpisode path runs and the physician sees it flagged. The poller
+        // never forwards a no-symptom-only episode on its own.
+        boolean hasRealSymptom = submissions.stream()
                 .filter(s -> s.getProcessingStatus() == ProcessingStatus.COMPLETED)
-                .anyMatch(s -> !symptomTextOf(s).isBlank());
-        if (!hasText) {
+                .anyMatch(s -> s.getAiAnalysisRelevance() != MediaRelevance.NO_SYMPTOM
+                        && !symptomTextOf(s).isBlank());
+        if (!hasRealSymptom) {
             return;
         }
         triage(episode);
@@ -248,7 +252,7 @@ public class AiTriageService {
                 e.getUpdatedAt(),
                 submissions.stream().map(s -> new SubmissionResponse(
                         s.getId(), s.getInputType(), s.getTextContent(), s.getMediaUrl(),
-                        s.getTranscription(), s.getAiAnalysisResult(),
+                        s.getTranscription(), s.getAiAnalysisResult(), s.getAiAnalysisRelevance(),
                         s.getProcessingStatus(), s.getSubmittedAt()
                 )).toList()
         );

@@ -117,6 +117,33 @@ describe("submitMediaSymptomCheck", () => {
     // 4. triage the episode
     expect(mockApi.mock.calls[3][0]).toBe("/episodes/ep5/triage");
 
-    expect(result.status).toBe("AI_ANALYZED");
+    expect(result.kind).toBe("triaged");
+    if (result.kind === "triaged") expect(result.episode.status).toBe("AI_ANALYZED");
+  });
+
+  it("does NOT triage a photo the AI saw no symptom in — returns needs_review instead", async () => {
+    mockUpload.mockResolvedValueOnce({ mediaUrl: "/api/v1/media/m2", contentType: "image/png" });
+    mockApi
+      .mockResolvedValueOnce(episode({ id: "ep6", status: "SUBMITTED" })) // start
+      .mockResolvedValueOnce({ id: "sub10" }) // addSubmission
+      .mockResolvedValueOnce({
+        id: "sub10",
+        processingStatus: "COMPLETED",
+        aiAnalysisRelevance: "NO_SYMPTOM",
+        aiAnalysisResult: "This looks like a photo of a dog, not a symptom.",
+      }); // process
+
+    const blob = new Blob([new Uint8Array([1])], { type: "image/png" });
+    const result = await submitMediaSymptomCheck({ patientId: "p1", inputType: "PHOTO", blob });
+
+    // Stops after process — no triage call.
+    expect(mockApi).toHaveBeenCalledTimes(3);
+    expect(mockApi.mock.calls.some((c) => String(c[0]).endsWith("/triage"))).toBe(false);
+
+    expect(result.kind).toBe("needs_review");
+    if (result.kind === "needs_review") {
+      expect(result.episodeId).toBe("ep6");
+      expect(result.description).toBe("This looks like a photo of a dog, not a symptom.");
+    }
   });
 });

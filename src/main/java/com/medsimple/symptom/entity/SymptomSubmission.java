@@ -46,6 +46,12 @@ public class SymptomSubmission {
     @Column(name = "ai_analysis_result")
     private String aiAnalysisResult;
 
+    // For a PHOTO: whether the image actually shows a medical symptom. Drives the patient prompt
+    // (retake / describe / send anyway) and the physician-side flag. NULL for text/voice.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ai_analysis_relevance")
+    private MediaRelevance aiAnalysisRelevance;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "processing_status", nullable = false)
     @Builder.Default
