@@ -2,9 +2,13 @@ package com.medsimple.physician.service;
 
 import com.medsimple.audit.service.AuditService;
 import com.medsimple.clinic.entity.Clinic;
+import com.medsimple.clinic.entity.ClinicStaff;
+import com.medsimple.clinic.entity.VerificationStatus;
 import com.medsimple.clinic.exception.ClinicNotFoundException;
 import com.medsimple.clinic.repository.ClinicRepository;
+import com.medsimple.clinic.repository.ClinicStaffRepository;
 import com.medsimple.patient.repository.PatientRepository;
+import com.medsimple.shared.exception.BusinessRuleException;
 import com.medsimple.physician.dto.ConfirmUrgencyRequest;
 import com.medsimple.physician.dto.QueueEntryResponse;
 import com.medsimple.shared.entity.User;
@@ -34,10 +38,15 @@ class PhysicianQueueServiceTest {
 
     @Mock SymptomEpisodeRepository episodeRepository;
     @Mock ClinicRepository clinicRepository;
+    @Mock ClinicStaffRepository staffRepository;
     @Mock PatientRepository userRepository;
     @Mock AuditService auditService;
 
     @InjectMocks PhysicianQueueService queueService;
+
+    private static ClinicStaff staffWith(VerificationStatus status) {
+        return ClinicStaff.builder().id(UUID.randomUUID()).verificationStatus(status).active(true).build();
+    }
 
     private UUID clinicId;
 
@@ -141,6 +150,8 @@ class PhysicianQueueServiceTest {
 
         when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(ep));
         when(userRepository.findByIdAndRole(physicianId, UserRole.PHYSICIAN)).thenReturn(Optional.of(physician));
+        when(staffRepository.findByUserIdAndActiveTrue(physicianId))
+                .thenReturn(List.of(staffWith(VerificationStatus.VERIFIED)));
         when(episodeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         QueueEntryResponse response = queueService.assignPhysician(episodeId, physicianId, "127.0.0.1");
@@ -148,6 +159,27 @@ class PhysicianQueueServiceTest {
         assertThat(response.assignedPhysicianId()).isEqualTo(physicianId);
         assertThat(response.status()).isEqualTo(EpisodeStatus.ASSIGNED);
         verify(auditService).log(physicianId, "EPISODE_ASSIGNED", "symptom_episodes", episodeId, "127.0.0.1");
+    }
+
+    @Test
+    void assignPhysician_unverifiedPhysician_blocked() {
+        UUID episodeId = UUID.randomUUID();
+        UUID physicianId = UUID.randomUUID();
+        SymptomEpisode ep = episode(UrgencyLevel.URGENT, null, OffsetDateTime.now(), "P");
+        ep.setStatus(EpisodeStatus.AI_ANALYZED);
+        User physician = User.builder().id(physicianId).role(UserRole.PHYSICIAN)
+                .firstName("Doc").lastName("Smith").email("doc@x.com").build();
+
+        when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(ep));
+        when(userRepository.findByIdAndRole(physicianId, UserRole.PHYSICIAN)).thenReturn(Optional.of(physician));
+        when(staffRepository.findByUserIdAndActiveTrue(physicianId))
+                .thenReturn(List.of(staffWith(VerificationStatus.UNVERIFIED)));
+
+        assertThatThrownBy(() -> queueService.assignPhysician(episodeId, physicianId, "127.0.0.1"))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("credential-verified");
+        assertThat(ep.getAssignedPhysician()).isNull();
+        verify(episodeRepository, never()).save(any());
     }
 
     // ── confirmUrgency ──────────────────────────────────────────────────────────
