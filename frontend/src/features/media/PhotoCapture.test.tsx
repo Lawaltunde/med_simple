@@ -12,8 +12,21 @@ function fileInput(): HTMLInputElement {
   return document.querySelector('input[type="file"]') as HTMLInputElement;
 }
 
+function mockCamera(getUserMedia: () => unknown) {
+  Object.defineProperty(navigator, "mediaDevices", {
+    value: { getUserMedia },
+    configurable: true,
+  });
+}
+
 describe("PhotoCapture", () => {
-  it("accepts a valid image, previews it, and emits the file", async () => {
+  it("offers both take-photo and gallery options", () => {
+    render(<PhotoCapture onChange={vi.fn()} />);
+    expect(screen.getByRole("button", { name: /take photo/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /choose from gallery/i })).toBeInTheDocument();
+  });
+
+  it("accepts a valid image from the gallery, previews it, and emits the file", async () => {
     const onChange = vi.fn();
     const user = userEvent.setup();
     render(<PhotoCapture onChange={onChange} />);
@@ -27,8 +40,8 @@ describe("PhotoCapture", () => {
 
   it("rejects a non-image file with an error and emits nothing", async () => {
     const onChange = vi.fn();
-    // applyAccept:false (a setup option) so userEvent doesn't pre-filter on the input's accept=
-    // attribute — we want the non-image to reach the component so its own validation produces the error.
+    // applyAccept:false so userEvent doesn't pre-filter on the input's accept= attribute — we want
+    // the non-image to reach the component so its own validation produces the error.
     const user = userEvent.setup({ applyAccept: false });
     render(<PhotoCapture onChange={onChange} />);
 
@@ -37,5 +50,17 @@ describe("PhotoCapture", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/jpeg, png, or webp/i);
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("falls back to gallery when the camera is unavailable", async () => {
+    mockCamera(vi.fn().mockRejectedValue(new Error("denied")));
+    const user = userEvent.setup();
+    render(<PhotoCapture onChange={vi.fn()} />);
+
+    await user.click(screen.getByRole("button", { name: /take photo/i }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/camera unavailable/i);
+    // Gallery remains available as the fallback.
+    expect(screen.getByRole("button", { name: /choose from gallery/i })).toBeInTheDocument();
   });
 });
