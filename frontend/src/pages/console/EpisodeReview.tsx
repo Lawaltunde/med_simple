@@ -276,6 +276,11 @@ function AssignCard({ episode, episodeId }: { episode: Episode; episodeId: strin
             {assign.isPending ? <Loader2 className="size-4 animate-spin" /> : <UserCheck className="size-4" />}
             {assignedToOther ? "Take over" : "Assign to me"}
           </Button>
+          {assign.error && (
+            <p className="mt-3 text-sm text-[--color-urgency-emergency]" role="alert">
+              {assign.error instanceof ApiError ? assign.error.message : "Could not assign this episode."}
+            </p>
+          )}
         </>
       )}
     </section>
