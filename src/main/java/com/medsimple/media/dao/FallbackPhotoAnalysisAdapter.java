@@ -5,7 +5,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Non-AI photo analysis — deterministic, no external calls.
- * Default adapter; active when ai.media.adapter is not set to openai.
+ * Default adapter; active when ai.photo.adapter is not set to openai.
  */
 @Component
 public class FallbackPhotoAnalysisAdapter implements PhotoAnalysisDao {

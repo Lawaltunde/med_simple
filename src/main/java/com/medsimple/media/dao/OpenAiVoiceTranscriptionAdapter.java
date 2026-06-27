@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Whisper transcription of a patient voice note via Spring AI's OpenAiAudioTranscriptionModel.
- * Active when ai.media.adapter=openai.
+ * Active when ai.voice.adapter=openai.
  *
  * PHI: the mediaUrl is an auth-gated in-platform path (/api/v1/media/{id}), not externally
  * fetchable. The adapter resolves it to the stored bytes via {@link MediaStorageDao} and
@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Primary
 @Component
-@ConditionalOnProperty(name = "ai.media.adapter", havingValue = "openai")
+@ConditionalOnProperty(name = "ai.voice.adapter", havingValue = "openai")
 public class OpenAiVoiceTranscriptionAdapter implements VoiceTranscriptionDao {
 
     // Whisper fails intermittently on valid audio (timeout / rate-limit / 5xx); an immediate
