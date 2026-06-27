@@ -2,6 +2,7 @@ package com.medsimple.media.dao;
 
 import com.medsimple.media.storage.MediaContent;
 import com.medsimple.media.storage.MediaStorageDao;
+import com.medsimple.symptom.entity.MediaRelevance;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -26,10 +27,22 @@ import org.springframework.util.MimeTypeUtils;
 public class OpenAiPhotoAnalysisAdapter implements PhotoAnalysisDao {
 
     private static final String PROMPT = """
-            You are assisting a primary care clinician. Describe this patient-submitted medical
-            image factually: what body area is shown and the visible clinical findings
-            (e.g. redness, swelling, rash pattern, wound, discoloration). Do not diagnose or
-            advise treatment. Two or three sentences.
+            You are assisting a primary care clinician. A patient uploaded this image. Do NOT assume
+            it shows a medical concern — it might be unrelated (a pet, a screenshot, a selfie with
+            nothing visibly wrong).
+
+            First decide whether the image shows a visible MEDICAL symptom (rash, wound, swelling,
+            redness, discoloration, injury, or similar):
+            - relevance = SYMPTOM_PRESENT if a visible symptom is clearly shown
+            - relevance = NO_SYMPTOM if the image does not show a medical symptom
+            - relevance = UNSURE if it is too blurry or ambiguous to tell
+
+            Then write a factual two-or-three-sentence description:
+            - If SYMPTOM_PRESENT: the body area shown and the visible findings. Do not diagnose or
+              advise treatment.
+            - If NO_SYMPTOM: state plainly that no visible medical symptom is present and, briefly,
+              what the image appears to show. Do NOT invent clinical findings.
+            - If UNSURE: say what is unclear.
             """;
 
     // GPT-4o vision fails intermittently on valid images (timeout / rate-limit / 5xx); an
@@ -46,7 +59,7 @@ public class OpenAiPhotoAnalysisAdapter implements PhotoAnalysisDao {
     }
 
     @Override
-    public String analyze(String mediaUrl) {
+    public PhotoAnalysisResult analyze(String mediaUrl) {
         try {
             return MediaModelRetry.withRetry("OpenAI photo analysis", MAX_ATTEMPTS, BASE_BACKOFF_MILLIS,
                     () -> {
@@ -55,12 +68,14 @@ public class OpenAiPhotoAnalysisAdapter implements PhotoAnalysisDao {
                         return chatClient.prompt()
                                 .user(u -> u.text(PROMPT).media(mimeType, media.resource()))
                                 .call()
-                                .content();
+                                .entity(PhotoAnalysisResult.class);
                     });
         } catch (Exception e) {
-            // Every attempt failed. Log the failure, not the media or any identifier.
+            // Every attempt failed. UNSURE (never silently dropped) so a clinician still reviews.
+            // Log the failure, not the media or any identifier.
             log.error("OpenAI photo analysis failed after retries; falling back to clinician review note", e);
-            return "[Photo received. Automatic analysis failed; a clinician will review the image.]";
+            return new PhotoAnalysisResult(MediaRelevance.UNSURE,
+                    "[Photo received. Automatic analysis failed; a clinician will review the image.]");
         }
     }
 }

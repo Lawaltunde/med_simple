@@ -1,6 +1,7 @@
 package com.medsimple.symptom.dto;
 
 import com.medsimple.symptom.entity.InputType;
+import com.medsimple.symptom.entity.MediaRelevance;
 import com.medsimple.symptom.entity.ProcessingStatus;
 
 import java.time.OffsetDateTime;
@@ -13,6 +14,7 @@ public record SubmissionResponse(
         String mediaUrl,
         String transcription,
         String aiAnalysisResult,
+        MediaRelevance aiAnalysisRelevance,
         ProcessingStatus processingStatus,
         OffsetDateTime submittedAt
 ) {}

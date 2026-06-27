@@ -14,9 +14,11 @@ vi.mock("@/auth/AuthProvider", () => ({
 // hooks (useSubmitSymptomCheck / useSubmitMediaSymptomCheck) run for real over these stubs.
 const textMock = vi.fn();
 const mediaMock = vi.fn();
+const triageMock = vi.fn();
 vi.mock("@/features/symptom/api", () => ({
   submitTextSymptomCheck: (...args: unknown[]) => textMock(...args),
   submitMediaSymptomCheck: (...args: unknown[]) => mediaMock(...args),
+  triageEpisode: (...args: unknown[]) => triageMock(...args),
 }));
 
 // Capture navigation; keep the rest of react-router-dom real (MemoryRouter, useSearchParams).
@@ -58,6 +60,7 @@ describe("NewSymptomCheck", () => {
   beforeEach(() => {
     textMock.mockReset();
     mediaMock.mockReset();
+    triageMock.mockReset();
     navigateMock.mockReset();
   });
   afterEach(() => vi.clearAllMocks());
@@ -109,7 +112,7 @@ describe("NewSymptomCheck", () => {
   // ── photo + voice modes ────────────────────────────────────────────────────────
 
   it("opens directly in photo mode from a deep link and submits a photo check", async () => {
-    mediaMock.mockResolvedValueOnce({ id: "ep-7", patientId: "patient-1" });
+    mediaMock.mockResolvedValueOnce({ kind: "triaged", episode: { id: "ep-7", patientId: "patient-1" } });
     const user = userEvent.setup();
     renderScreen("/app/new?mode=PHOTO");
 
@@ -128,7 +131,7 @@ describe("NewSymptomCheck", () => {
   });
 
   it("switches to voice mode via the tab and submits a voice check", async () => {
-    mediaMock.mockResolvedValueOnce({ id: "ep-9", patientId: "patient-1" });
+    mediaMock.mockResolvedValueOnce({ kind: "triaged", episode: { id: "ep-9", patientId: "patient-1" } });
     const user = userEvent.setup();
     renderScreen();
 
@@ -138,5 +141,62 @@ describe("NewSymptomCheck", () => {
 
     await waitFor(() => expect(mediaMock).toHaveBeenCalledTimes(1));
     expect(mediaMock.mock.calls[0][0]).toMatchObject({ inputType: "VOICE" });
+  });
+
+  // ── photo with no visible symptom: prompt, don't auto-triage ────────────────────
+
+  it("prompts for review instead of navigating when the photo shows no symptom", async () => {
+    mediaMock.mockResolvedValueOnce({
+      kind: "needs_review",
+      episodeId: "ep-nr",
+      description: "This looks like a photo of a dog, not a symptom.",
+    });
+    const user = userEvent.setup();
+    renderScreen("/app/new?mode=PHOTO");
+
+    await user.click(screen.getByRole("button", { name: /pick-photo/i }));
+    await user.click(screen.getByRole("button", { name: /submit for triage/i }));
+
+    // No navigation yet — the patient is shown the choice.
+    expect(await screen.findByText(/couldn't see a clear symptom/i)).toBeInTheDocument();
+    expect(navigateMock).not.toHaveBeenCalled();
+    expect(triageMock).not.toHaveBeenCalled();
+  });
+
+  it("sends the photo for review anyway, triaging the held episode", async () => {
+    mediaMock.mockResolvedValueOnce({
+      kind: "needs_review",
+      episodeId: "ep-nr",
+      description: "No visible symptom.",
+    });
+    triageMock.mockResolvedValueOnce({ id: "ep-nr", patientId: "patient-1" });
+    const user = userEvent.setup();
+    renderScreen("/app/new?mode=PHOTO");
+
+    await user.click(screen.getByRole("button", { name: /pick-photo/i }));
+    await user.click(screen.getByRole("button", { name: /submit for triage/i }));
+    await user.click(await screen.findByRole("button", { name: /send for review anyway/i }));
+
+    await waitFor(() => expect(triageMock).toHaveBeenCalledWith("ep-nr"));
+    await waitFor(() => expect(navigateMock).toHaveBeenCalledWith("/app/episodes/ep-nr"));
+  });
+
+  it("lets the patient choose a different photo, dismissing the prompt without triaging", async () => {
+    mediaMock.mockResolvedValueOnce({
+      kind: "needs_review",
+      episodeId: "ep-nr",
+      description: "No visible symptom.",
+    });
+    const user = userEvent.setup();
+    renderScreen("/app/new?mode=PHOTO");
+
+    await user.click(screen.getByRole("button", { name: /pick-photo/i }));
+    await user.click(screen.getByRole("button", { name: /submit for triage/i }));
+    await user.click(await screen.findByRole("button", { name: /choose a different photo/i }));
+
+    // Back to the picker; nothing triaged, no navigation.
+    expect(screen.getByRole("button", { name: /pick-photo/i })).toBeInTheDocument();
+    expect(triageMock).not.toHaveBeenCalled();
+    expect(navigateMock).not.toHaveBeenCalled();
   });
 });

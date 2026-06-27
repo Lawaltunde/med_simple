@@ -42,7 +42,8 @@ class MediaProcessingControllerTest {
     void process_returns200WithResult() throws Exception {
         ProcessedSubmissionResponse response = new ProcessedSubmissionResponse(
                 submissionId, InputType.PHOTO, "storage://p.jpg", null,
-                "Erythematous rash on the forearm", ProcessingStatus.COMPLETED);
+                "Erythematous rash on the forearm",
+                com.medsimple.symptom.entity.MediaRelevance.SYMPTOM_PRESENT, ProcessingStatus.COMPLETED);
         when(mediaProcessingService.processForCaller(submissionId)).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/submissions/{id}/process", submissionId))

@@ -67,3 +67,4 @@ src/main/resources/static/banners_logo/
 
 ### Agent git worktrees — local scratch, never tracked or indexed
 .claude/worktrees/
+.DS_Store

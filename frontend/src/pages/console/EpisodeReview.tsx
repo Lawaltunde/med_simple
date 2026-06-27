@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useParams, useLocation } from "react-router-dom";
-import { ArrowLeft, Loader2, Sparkles, UserCheck, CheckCircle2, AlertCircle, ClipboardList, Bot, X } from "lucide-react";
+import { ArrowLeft, Loader2, Sparkles, UserCheck, CheckCircle2, AlertCircle, ClipboardList, Bot, X, ImageOff } from "lucide-react";
 import { useAuth } from "@/auth/AuthProvider";
 import { useEpisode } from "@/features/symptom/hooks";
 import { effectiveUrgency, type Episode, type UrgencyLevel } from "@/features/symptom/types";
@@ -87,6 +87,19 @@ export function EpisodeReview() {
                     {s.textContent || s.transcription || s.aiAnalysisResult || "(media submission)"}
                     <span className="ml-2 text-xs text-muted">{formatDateTime(s.submittedAt)}</span>
                   </div>
+                  {/* Flag photos the AI couldn't confirm a symptom in, so the reading below isn't
+                      mistaken for a confident clinical finding. */}
+                  {s.inputType === "PHOTO" &&
+                    (s.aiAnalysisRelevance === "NO_SYMPTOM" || s.aiAnalysisRelevance === "UNSURE") && (
+                      <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-800">
+                        <ImageOff className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
+                        <span>
+                          {s.aiAnalysisRelevance === "NO_SYMPTOM"
+                            ? "No visible symptom detected in this image — the patient chose to send it anyway. Treat the reading above as unconfirmed."
+                            : "The AI couldn't confirm a symptom in this image. Treat the reading above as unconfirmed."}
+                        </span>
+                      </div>
+                    )}
                   {/* The actual photo / voice note, not just the AI's text reading of it. The GET is
                       ownership-gated and staff-allowed, so AuthedMedia fetches it with the token. */}
                   {s.mediaUrl && (s.inputType === "PHOTO" || s.inputType === "VOICE") && (

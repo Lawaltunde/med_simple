@@ -156,6 +156,7 @@ public class SymptomService {
                 s.getMediaUrl(),
                 s.getTranscription(),
                 s.getAiAnalysisResult(),
+                s.getAiAnalysisRelevance(),
                 s.getProcessingStatus(),
                 s.getSubmittedAt()
         );

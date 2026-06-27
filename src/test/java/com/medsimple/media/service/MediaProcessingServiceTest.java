@@ -2,6 +2,7 @@ package com.medsimple.media.service;
 
 import com.medsimple.audit.service.AuditService;
 import com.medsimple.media.dao.PhotoAnalysisDao;
+import com.medsimple.media.dao.PhotoAnalysisResult;
 import com.medsimple.media.dao.VoiceTranscriptionDao;
 import com.medsimple.media.dto.ProcessedSubmissionResponse;
 import com.medsimple.media.exception.SubmissionNotFoundException;
@@ -9,6 +10,7 @@ import com.medsimple.media.repository.MediaSubmissionRepository;
 import com.medsimple.shared.entity.User;
 import com.medsimple.shared.entity.UserRole;
 import com.medsimple.symptom.entity.InputType;
+import com.medsimple.symptom.entity.MediaRelevance;
 import com.medsimple.symptom.entity.ProcessingStatus;
 import com.medsimple.symptom.entity.SymptomSubmission;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,13 +78,15 @@ class MediaProcessingServiceTest {
     void process_photo_analyzesAndCompletes() {
         SymptomSubmission s = submission(InputType.PHOTO, ProcessingStatus.PENDING, "storage://p.jpg");
         when(submissionRepository.findById(s.getId())).thenReturn(Optional.of(s));
-        when(photoAnalysisDao.analyze("storage://p.jpg")).thenReturn("Erythematous rash on the left forearm");
+        when(photoAnalysisDao.analyze("storage://p.jpg")).thenReturn(
+                new PhotoAnalysisResult(MediaRelevance.SYMPTOM_PRESENT, "Erythematous rash on the left forearm"));
         when(submissionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         ProcessedSubmissionResponse response = service.process(s.getId());
 
         assertThat(response.processingStatus()).isEqualTo(ProcessingStatus.COMPLETED);
         assertThat(response.aiAnalysisResult()).isEqualTo("Erythematous rash on the left forearm");
+        assertThat(response.aiAnalysisRelevance()).isEqualTo(MediaRelevance.SYMPTOM_PRESENT);
         verify(voiceTranscriptionDao, never()).transcribe(any());
     }
 
@@ -140,7 +144,8 @@ class MediaProcessingServiceTest {
     void processForCaller_ownSubmission_gatesThenProcesses() {
         SymptomSubmission s = submission(InputType.PHOTO, ProcessingStatus.PENDING, "/api/v1/media/x");
         when(submissionRepository.findById(s.getId())).thenReturn(Optional.of(s));
-        when(photoAnalysisDao.analyze("/api/v1/media/x")).thenReturn("Rash on forearm");
+        when(photoAnalysisDao.analyze("/api/v1/media/x"))
+                .thenReturn(new PhotoAnalysisResult(MediaRelevance.SYMPTOM_PRESENT, "Rash on forearm"));
         when(submissionRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         ProcessedSubmissionResponse response = service.processForCaller(s.getId());

@@ -73,7 +73,9 @@ public class MediaProcessingService {
             if (submission.getInputType() == InputType.VOICE) {
                 submission.setTranscription(voiceTranscriptionDao.transcribe(submission.getMediaUrl()));
             } else { // PHOTO
-                submission.setAiAnalysisResult(photoAnalysisDao.analyze(submission.getMediaUrl()));
+                var analysis = photoAnalysisDao.analyze(submission.getMediaUrl());
+                submission.setAiAnalysisResult(analysis.description());
+                submission.setAiAnalysisRelevance(analysis.relevance());
             }
             submission.setProcessingStatus(ProcessingStatus.COMPLETED);
             auditService.log(submission.getPatient().getId(), "SUBMISSION_PROCESSED",
@@ -89,6 +91,7 @@ public class MediaProcessingService {
     private ProcessedSubmissionResponse toResponse(SymptomSubmission s) {
         return new ProcessedSubmissionResponse(
                 s.getId(), s.getInputType(), s.getMediaUrl(),
-                s.getTranscription(), s.getAiAnalysisResult(), s.getProcessingStatus());
+                s.getTranscription(), s.getAiAnalysisResult(), s.getAiAnalysisRelevance(),
+                s.getProcessingStatus());
     }
 }
