@@ -1,5 +1,6 @@
 package com.medsimple.media.dao;
 
+import com.medsimple.symptom.entity.MediaRelevance;
 import org.springframework.stereotype.Component;
 
 /**
@@ -10,8 +11,9 @@ import org.springframework.stereotype.Component;
 public class FallbackPhotoAnalysisAdapter implements PhotoAnalysisDao {
 
     @Override
-    public String analyze(String mediaUrl) {
-        return "[Photo received. Automatic image analysis is not enabled; "
-                + "a clinician will review the image.]";
+    public PhotoAnalysisResult analyze(String mediaUrl) {
+        // No AI to judge relevance — UNSURE, so the image still reaches a clinician, flagged.
+        return new PhotoAnalysisResult(MediaRelevance.UNSURE,
+                "[Photo received. Automatic image analysis is not enabled; a clinician will review the image.]");
     }
 }

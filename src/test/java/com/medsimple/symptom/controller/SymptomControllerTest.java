@@ -90,7 +90,7 @@ class SymptomControllerTest {
     void addTextSubmission_returns201() throws Exception {
         AddSubmissionRequest request = new AddSubmissionRequest(InputType.TEXT, "Chest pain", null);
         SubmissionResponse response = new SubmissionResponse(UUID.randomUUID(), InputType.TEXT,
-                "Chest pain", null, null, null, ProcessingStatus.COMPLETED, OffsetDateTime.now());
+                "Chest pain", null, null, null, null, ProcessingStatus.COMPLETED, OffsetDateTime.now());
 
         when(symptomService.addSubmission(eq(episodeId), any(), any())).thenReturn(response);
 

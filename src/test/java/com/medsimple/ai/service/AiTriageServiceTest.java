@@ -488,4 +488,42 @@ class AiTriageServiceTest {
 
         verifyNoInteractions(aiTriageDao);
     }
+
+    private SymptomSubmission photo(ProcessingStatus status, MediaRelevance relevance, String analysis) {
+        return SymptomSubmission.builder()
+                .id(UUID.randomUUID()).episode(episode).patient(patient)
+                .inputType(InputType.PHOTO).mediaUrl("/api/v1/media/p")
+                .aiAnalysisResult(analysis).aiAnalysisRelevance(relevance)
+                .processingStatus(status)
+                .submittedAt(OffsetDateTime.now()).createdAt(OffsetDateTime.now()).build();
+    }
+
+    @Test
+    void triageIfReady_photoWithNoVisibleSymptom_isNoOp() {
+        // A NO_SYMPTOM photo carries a description but no real complaint — the backstop must not
+        // assert urgency on it. Only a clinician's review (or the patient adding text) should.
+        when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
+        when(submissionRepository.findByEpisodeIdOrderBySubmittedAtAsc(episodeId))
+                .thenReturn(List.of(photo(ProcessingStatus.COMPLETED, MediaRelevance.NO_SYMPTOM,
+                        "This appears to be a photo of a dog, not a medical symptom.")));
+
+        aiTriageService.triageEpisodeIfReady(episodeId);
+
+        verifyNoInteractions(aiTriageDao);
+    }
+
+    @Test
+    void triageIfReady_photoWithVisibleSymptom_triages() {
+        when(episodeRepository.findById(episodeId)).thenReturn(Optional.of(episode));
+        when(submissionRepository.findByEpisodeIdOrderBySubmittedAtAsc(episodeId))
+                .thenReturn(List.of(photo(ProcessingStatus.COMPLETED, MediaRelevance.SYMPTOM_PRESENT,
+                        "Erythematous rash on the left forearm.")));
+        when(aiTriageDao.analyze(any())).thenReturn(new TriageResult(UrgencyLevel.SEE_SOON, "Localized rash."));
+        when(episodeRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        aiTriageService.triageEpisodeIfReady(episodeId);
+
+        assertThat(episode.getStatus()).isEqualTo(EpisodeStatus.AI_ANALYZED);
+        verify(aiTriageDao).analyze(any());
+    }
 }

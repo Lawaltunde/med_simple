@@ -13,8 +13,9 @@ class FallbackMediaAdaptersTest {
     }
 
     @Test
-    void photoFallback_returnsNonBlankPlaceholder() {
-        String result = new FallbackPhotoAnalysisAdapter().analyze("storage://p.jpg");
-        assertThat(result).isNotBlank().contains("Photo");
+    void photoFallback_returnsUnsureWithNonBlankPlaceholder() {
+        var result = new FallbackPhotoAnalysisAdapter().analyze("storage://p.jpg");
+        assertThat(result.relevance()).isEqualTo(com.medsimple.symptom.entity.MediaRelevance.UNSURE);
+        assertThat(result.description()).isNotBlank().contains("Photo");
     }
 }
