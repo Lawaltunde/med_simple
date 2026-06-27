@@ -25,11 +25,13 @@ const episode: Episode = {
     {
       id: "photo1", inputType: "PHOTO", textContent: null, mediaUrl: "/api/v1/media/m-photo",
       transcription: null, aiAnalysisResult: "Erythematous rash on the left forearm.",
+      aiAnalysisRelevance: "NO_SYMPTOM",
       processingStatus: "COMPLETED", submittedAt: "2026-06-17T11:00:00Z",
     },
     {
       id: "voice1", inputType: "VOICE", textContent: null, mediaUrl: "/api/v1/media/m-voice",
       transcription: "It started itching yesterday.", aiAnalysisResult: null,
+      aiAnalysisRelevance: null,
       processingStatus: "COMPLETED", submittedAt: "2026-06-17T11:05:00Z",
     },
   ],
@@ -99,5 +101,10 @@ describe("EpisodeReview media", () => {
     const urls = fetchMock.mock.calls.map((c) => c[0]);
     expect(urls).toContain("/api/v1/media/m-photo");
     expect(urls).toContain("/api/v1/media/m-voice");
+  });
+
+  it("flags a photo the AI saw no symptom in, so the reading isn't read as confirmed", () => {
+    renderReview();
+    expect(screen.getByText(/no visible symptom detected in this image/i)).toBeInTheDocument();
   });
 });

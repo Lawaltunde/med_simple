@@ -4,8 +4,10 @@ import {
   listEpisodes,
   submitTextSymptomCheck,
   submitMediaSymptomCheck,
+  triageEpisode,
   type TextSymptomCheck,
   type MediaSymptomCheck,
+  type MediaSubmitResult,
 } from "./api";
 import type { Episode } from "./types";
 
@@ -51,10 +53,22 @@ export function useSubmitSymptomCheck() {
 }
 
 // Photo/voice intake: upload → submission → synchronous process → triage, as one mutation.
+// A photo the AI saw no symptom in returns { kind: "needs_review" } instead, untriaged.
 export function useSubmitMediaSymptomCheck() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: MediaSymptomCheck) => submitMediaSymptomCheck(input),
+    onSuccess: (result: MediaSubmitResult) => {
+      if (result.kind === "triaged") seedEpisode(qc, result.episode);
+    },
+  });
+}
+
+// "Send for review anyway": triage the photo episode the patient chose to forward.
+export function useTriageEpisode() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (episodeId: string) => triageEpisode(episodeId),
     onSuccess: (episode: Episode) => seedEpisode(qc, episode),
   });
 }

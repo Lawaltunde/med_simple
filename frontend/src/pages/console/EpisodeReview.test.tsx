@@ -23,7 +23,7 @@ const episode: Episode = {
   submissions: [
     {
       id: "s1", inputType: "TEXT", textContent: "throat hurts", mediaUrl: null,
-      transcription: null, aiAnalysisResult: null, processingStatus: "COMPLETED",
+      transcription: null, aiAnalysisResult: null, aiAnalysisRelevance: null, processingStatus: "COMPLETED",
       submittedAt: "2026-06-17T11:00:00Z",
     },
   ],
