@@ -1,0 +1,3 @@
+# Reviewed false positives. Format: <commit>:<file>:<rule>:<line>
+# Javadoc prose about S3 path-style addressing matched generic-api-key. It contains no secret.
+0b8d661a95e2a21c8266f3bc2e8ed9557e5f915f:src/main/java/com/medsimple/media/storage/MediaStorageS3Config.java:generic-api-key:20

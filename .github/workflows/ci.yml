@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Least privilege: jobs only read the repository.
+permissions:
+  contents: read
+
+# A newer push to the same branch or PR cancels the run in progress.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend build and tests (Java 17)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      # The compliance integration tests (pgcompliance profile) run against a real,
+      # Flyway-migrated PostgreSQL on localhost:5333, the same port docker-compose uses locally.
+      # These credentials are the committed dev defaults for a throwaway CI database, not secrets.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: medsimple
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: medsimple
+        ports:
+          - 5333:5432
+        options: >-
+          --health-cmd "pg_isready -U medsimple -d medsimple"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      # Runs the gate test lane. The paid LLM eval lane (@Tag("eval")) is excluded by the
+      # pom, and every AI adapter defaults to its deterministic fallback, so no API keys are used.
+      - name: Build and test
+        run: ./mvnw -B -ntp verify
+
+  frontend:
+    name: Frontend type check, tests and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Check out code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read # lets gitleaks list the commits in a pull request
+    steps:
+      - name: Check out code with full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The token is read-only, so findings go to the job summary instead of PR comments.
+          GITLEAKS_ENABLE_COMMENTS: 'false'
