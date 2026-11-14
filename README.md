@@ -1,333 +1,117 @@
 # MedSimple
 
-AI-coordinated patient intake, triage support, and care orchestration built on top of Canada's existing healthcare systems.
+[![CI](https://github.com/Lawaltunde/med_simple/actions/workflows/ci.yml/badge.svg)](https://github.com/Lawaltunde/med_simple/actions/workflows/ci.yml)
 
----
+A patient intake and triage app for primary-care clinics: patients report symptoms as they happen,
+and physicians see a queue ordered by urgency instead of booking time.
 
-## What It Does
+Demo video: https://www.youtube.com/watch?v=YZbIeKGoZLc
 
-MedSimple is a B2B digital health platform that coordinates the journey between patients, physicians, pharmacies, and diagnostic centres. It is an orchestration layer — not a replacement for existing clinic software — that solves three measurable failures in Canadian primary care:
+## What it does
 
-- **The waiting gap** — symptoms go uncaptured between occurrence and appointment
-- **The memory gap** — patients reconstruct symptoms from memory in a 10-minute visit
-- **The prioritization gap** — physician queues are ordered by booking time, not clinical urgency
+- **Patients** report symptoms as text, a voice note or a photo (upload or camera). Entries for the
+  same complaint are grouped into one episode. A symptom assistant chat gives general,
+  non-diagnostic guidance and shows a call-911 banner when it detects a red flag.
+- **Physicians** work from a triage queue sorted by urgency (ROUTINE, SEE SOON, URGENT, EMERGENCY).
+  Each episode has an AI summary next to the patient's original notes, recordings and photos. The
+  physician confirms or overrides the urgency, with a required reason that is logged.
+- From the episode, the physician writes a care plan with prescriptions (checked for allergies and
+  known drug interactions before signing), lab requisitions and specialist referrals, books
+  appointments (with `.ics` calendar export) and releases results with their own interpretation.
+- **Clinic admins** manage staff and turn integrations on or off per clinic. A physician must have
+  verified credentials before they can take patients.
 
-Patients submit symptoms as they occur. An AI engine consolidates them, assigns urgency, and surfaces a structured clinical summary to the assigned physician. The platform then manages the full coordination loop: prescriptions, diagnostic requisitions, referrals, results, and follow-up — until the episode of care is closed.
+The app is a proof of concept with six roles (patient, physician, nurse, receptionist, clinic
+admin, super admin). It has not been used with real patients.
 
----
+## How it's built
 
-## Architecture
-
-**Package-by-feature with N-tier layers.** Each domain module (patient, clinic, symptom, media, ai, careplan, prescription, diagnostic, referral, appointment, wearable, physician, notification, auth, audit) is self-contained, layered into `entity` / `dto` / `dao` / `repository` / `service` / `controller` subpackages. Services communicate via dependency injection. DAO interfaces are used wherever multiple implementations exist — a real adapter and a fallback adapter implementing the same interface.
-
-**Fallback-first design.** Every external integration ships with a built-in fallback that works with zero third-party connectivity:
-
-| Integration | Real adapter | Fallback |
-|---|---|---|
-| PrescribeIT | Electronic e-prescribing | Signed PDF for fax or hand delivery |
-| Ocean eReferral | Electronic referral submission | PDF referral letter |
-| Lab networks | Electronic requisition + booking | Printable requisition form |
-| Pharmacy ordering | Electronic order dispatch | Patient walks in with printed prescription |
-
-A per-clinic capability registry (`clinic_capabilities` table) resolves which implementation to use at runtime. A clinic with no integrations can adopt MedSimple on day one.
-
-**FHIR R4 data model.** Clinical entities are modelled on HL7 FHIR R4:
-
-| Table | FHIR resource |
+| Area | Technology |
 |---|---|
-| `symptom_episodes` | EpisodeOfCare |
-| `symptom_submissions` | Observation |
-| `care_plans` | CarePlan |
-| `prescriptions` | MedicationRequest |
-| `referrals` | ServiceRequest (intent = referral) |
-| `diagnostic_requisitions` | ServiceRequest |
-| `diagnostic_results` | DiagnosticReport |
-| `wearable_readings` | Observation (vital-signs / activity, patient-generated) |
+| Backend | Java 17, Spring Boot 4, Spring Security (JWT), Spring Data JPA |
+| Database | PostgreSQL 16, Flyway migrations |
+| AI | Spring AI with OpenAI (chat, Whisper transcription, vision), off by default |
+| Clinical data | HAPI FHIR R4 |
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS, TanStack Query |
+| Testing | JUnit, Mockito, AssertJ, Vitest, React Testing Library |
+| CI | GitHub Actions: backend tests against PostgreSQL, frontend tests and build, gitleaks |
 
----
+Code is organised by feature (`patient`, `symptom`, `physician`, `prescription`, `referral`,
+`diagnostic`, `media`, `ai`, `audit`, ...), each with its own entity, repository, service and
+controller layers.
 
-## Tech Stack
+Engineering decisions worth calling out:
 
-| Layer | Technology |
-|---|---|
-| Backend | Java 17, Spring Boot 4.x |
-| AI integration | Spring AI |
-| Clinical data modelling | HAPI FHIR R4 |
-| Database | PostgreSQL 16 |
-| Schema migrations | Flyway |
-| Testing | JUnit 5, Mockito |
-| Frontend | React + TypeScript + Vite + Tailwind (built output served from `src/main/resources/static`) |
-| Local dev database | Docker Compose (PostgreSQL 16) |
-| Staging / production database | Supabase (PostgreSQL, Storage, Realtime) |
+- **Every external integration sits behind an interface with a fallback.** For prescriptions,
+  referrals and lab requisitions, a resolver picks the electronic adapter or the printable fallback
+  at runtime from the clinic's settings (`clinic_capabilities`), so a clinic with no integrations
+  can still prescribe, refer and order tests. Each AI feature (triage, medication safety, specialty
+  suggestion, result summary, chat, voice, photo) is switched separately between OpenAI and a
+  deterministic rule-based fallback. The default is the fallback, so the app and its tests run
+  with no API keys. The fallback rules lean toward flagging: a false alarm costs a physician a
+  second look, a missed one could harm a patient.
+- **Electronic lab requisitions are real FHIR.** The requisition is built as a FHIR R4
+  `ServiceRequest` with HAPI FHIR and posted to a FHIR server (a local HAPI FHIR sandbox in
+  `docker-compose.yml`). If the lab endpoint is down, the order is still recorded and the failure
+  is logged instead of blocking the physician.
+- **Privacy is enforced in code and in the database.** Health card and insurance numbers are
+  encrypted with AES-256-GCM before they are stored. The audit log is append-only, enforced by a
+  PostgreSQL trigger, and integration tests check that updates and deletes are rejected. Patient
+  free text is passed through a redactor that strips identifiers (health card numbers, phone
+  numbers, emails, postal codes) before it is sent to an AI model.
+- **Voice and photo processing is asynchronous.** Uploads are stored first (local disk or any
+  S3-compatible store such as Supabase Storage), then a background poller transcribes or analyses
+  them, with a bounded retry so one timeout from the model does not leave a permanent failure note.
+- **Two test lanes.** The default suite is deterministic and free and runs on every push. AI
+  quality is measured separately by eval tests that call OpenAI against labelled cases with pass
+  thresholds (for example, every emergency case must be classified EMERGENCY). They are tagged
+  `eval`, excluded by default and run on demand with `-Pevals`.
 
----
+### Not built yet
 
-## Project Structure
+The electronic PrescribeIT and Ocean eReferral adapters and the CPSO credential lookup are
+placeholders that record a status without calling the real service (they need vendor onboarding).
+The printable fallbacks record a document reference, but PDF rendering is not implemented. Email
+notifications are logged instead of sent, and wearable sync uses synthetic data.
 
-Package-by-feature under `src/main/java/com/medsimple/`. Each module is layered into
-`entity` / `dto` / `dao` / `repository` / `service` / `controller` (and `exception`) subpackages.
-External integrations sit behind a `dao` interface with a real adapter and a fallback adapter.
+## Run it locally
 
-```
-src/main/java/com/medsimple/
-├── patient/        Patients, profiles, health coverage, clinic registration, consent
-├── clinic/         Clinics, capability registry, staff, physician credentialing
-├── symptom/        Symptom episodes and submissions (text / voice / photo)
-├── media/          Voice/photo storage, transcription + vision adapters, processing poller
-├── ai/             Triage, clinical summary, keyword RAG, patient symptom chat
-├── careplan/       Care plans, AI care suggestions, follow-ups
-├── prescription/   Prescription authoring, AI safety checks, PrescribeIT + PDF delivery
-├── diagnostic/     Requisitions, results, patient-release gate, lab + printable delivery
-├── referral/       AI-assisted referral triage, Ocean eReferral + PDF delivery
-├── appointment/    Visit / follow-up scheduling, .ics calendar export
-├── wearable/       Patient-generated vitals as FHIR Observations, sync + manual ingest
-├── physician/      Triage queue, episode assignment, urgency confirmation
-├── notification/   Email + in-app notifications
-├── auth/           Spring Security, JWT, refresh tokens, access guard
-├── audit/          Immutable PHIPA audit log
-├── config/         Cross-cutting configuration and the global exception handler
-└── shared/         Crypto, PHI redaction, common entities and exceptions
-
-src/main/resources/db/migration/   Flyway migrations (V{n}__{description}.sql)
-frontend/                          React + TypeScript + Vite app (built into resources/static)
-src/test/java/com/medsimple/       Tests mirroring the main package structure
-```
-
----
-
-## Local Development
-
-### Prerequisites
-
-- Java 17+
-- Docker and Docker Compose
-- Maven (or use `./mvnw`)
-
-### Setup
-
-**1. Start PostgreSQL:**
+Prerequisites: Java 17+, Docker, Node.js 22 (for the frontend).
 
 ```bash
-docker-compose up -d
+# 1. Start PostgreSQL on localhost:5333 (and a HAPI FHIR sandbox on 8090)
+docker compose up -d
+
+# 2. Required: a JWT signing secret of at least 32 bytes (there is no default)
+export JWT_SECRET="$(openssl rand -base64 48)"
+# Allow the refresh cookie over plain http on localhost
+export AUTH_COOKIE_SECURE=false
+
+# 3. Run the backend. Flyway applies the migrations on startup.
+#    The local profile seeds a demo clinic and users (see config/DemoSeedRunner.java).
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+
+# 4. Run the frontend dev server (proxies /api to localhost:8080)
+cd frontend && npm ci && npm run dev
 ```
 
-This starts `medsimple-db` (PostgreSQL 16) mapped to host port `5333`.
+The database defaults match `docker-compose.yml`; override them with `DB_URL`, `DB_USERNAME` and
+`DB_PASSWORD`. To use OpenAI instead of the fallbacks, set `OPENAI_API_KEY` and, per feature,
+`AI_TRIAGE_ADAPTER=openai`, `AI_SAFETY_ADAPTER=openai` and so on (see
+`src/main/resources/application.properties`).
 
-**2. Set environment variables:**
+To build one JAR that also serves the frontend: `./mvnw package -Pfrontend`.
+
+## Run the tests
 
 ```bash
-export DB_URL=jdbc:postgresql://localhost:5333/medsimple
-export DB_USERNAME=medsimple
-export DB_PASSWORD=password
+# Backend: unit tests use H2; the compliance tests need PostgreSQL on localhost:5333
+docker compose up -d db
+./mvnw verify
+
+# Frontend: type check, unit tests and production build
+cd frontend && npm ci && npm run lint && npm test && npm run build
 ```
 
-**3. Run the application:**
-
-Flyway migrations apply automatically on startup.
-
-```bash
-./mvnw spring-boot:run
-```
-
-### Build and Test
-
-```bash
-# Compile
-./mvnw package -DskipTests
-
-# Run all tests
-./mvnw test
-
-# Run a single test class
-./mvnw test -Dtest=SymptomServiceTest
-
-# Run a single test method
-./mvnw test -Dtest=SymptomServiceTest#shouldDispatchEmergencyAlert
-```
-
----
-
-## Database
-
-Flyway manages all schema changes. Files live in `src/main/resources/db/migration/` with naming convention `V{version}__{description}.sql`.
-
-Migrations apply automatically at startup. **Never modify a committed migration** — always add a new versioned file.
-
-Spring JPA is configured with `ddl-auto=none`. Flyway is the sole owner of schema state — Hibernate never creates or validates tables.
-
-### Tables
-
-| Table | Purpose |
-|---|---|
-| `clinics` | Tenant root — one row per clinic customer |
-| `clinic_capabilities` | Per-clinic adapter registry (PrescribeIT, Ocean, etc.) |
-| `users` | All actors: patients, physicians, nurses, admins |
-| `refresh_tokens` | Hashed JWT refresh tokens for session continuity |
-| `clinic_staff` | Maps physician/staff users to clinic with role, license, and credential-verification state |
-| `pharmacies` | Pharmacy directory with electronic-Rx flag |
-| `diagnostic_centres` | Diagnostic centre directory with electronic-booking flag |
-| `patient_profiles` | DOB, allergies, current medications, preferred pharmacy |
-| `patient_health_coverage` | Provincial health cards and private insurance (encrypted, supports multiples) |
-| `patient_clinic_registrations` | Patient-to-clinic relationship; holds assigned physician for non-walk-in patients |
-| `patient_consents` | Versioned consent records — immutable append-only |
-| `symptom_episodes` | One episode per complaint; AI urgency, summary, and physician confirmation |
-| `symptom_submissions` | Individual entries (text/voice/photo) accumulating into an episode |
-| `care_suggestions` | AI's advisory plan of care (PROPOSED), reviewed into a signed care plan by the physician |
-| `care_plans` | Physician's response plan; owns all prescriptions, requisitions, referrals |
-| `follow_ups` | Physician-patient messages and AI-monitoring-generated prompts |
-| `appointments` | Scheduled visits / follow-ups; `.ics` calendar export |
-| `prescriptions` | FHIR MedicationRequest — dual delivery path |
-| `referrals` | AI-assisted specialty referral — dual delivery path |
-| `diagnostic_requisitions` | FHIR ServiceRequest — dual delivery path |
-| `diagnostic_results` | FHIR DiagnosticReport — released to patient after physician interpretation |
-| `wearable_readings` | Patient-generated vitals (HR, steps, sleep, SpO2) as FHIR Observations, with source/provenance |
-| `notifications` | Email and in-app alerts with delivery and read tracking |
-| `audit_logs` | Immutable PHIPA-required trail of every PHI access and state change |
-
----
-
-## Feature Set
-
-### Patient
-
-- Submit symptoms at the moment they occur: free text, voice note, or photograph of a visible symptom
-- Voice notes transcribed automatically; photos analyzed by AI
-- Submissions timestamped and accumulated into a single evolving symptom record per episode
-- Emergency pathway: when AI detects red-flag patterns, patient receives immediate 911 instruction before any queueing occurs
-- Choose prescription fulfilment: walk into any pharmacy with a printed document, or send via app to a chosen pharmacy
-- Choose diagnostic path: print requisition and walk in, or send via app for the centre to book the appointment
-- Appointment reminders delivered by email and in-app alert
-- Access own test results alongside physician's interpretation
-- Follow-up communication with physician through the app
-- AI-generated prompts to report symptom updates during ongoing care
-- Connect a wearable / phone health source (heart rate, steps, sleep, SpO2); view trends on the Vitals & activity page
-- Patient symptom assistant chat: general, non-diagnostic guidance with a clinician always in the loop
-
-### Physician
-
-- Live triage queue sorted by AI-assessed urgency (not booking time); sickest patient always at the top
-- AI clinical summary per patient: chief complaint, key symptoms, duration, and relevant context — readable in under 30 seconds
-- Original patient notes and recordings accessible with one tap
-- One-click urgency override with mandatory reason; every override logged for regulatory validation evidence
-- Prescription authoring within the platform; AI performs drug-interaction checks, allergy flags, and dose-range verification before signing
-- AI-assisted referral triage: specialty suggested from consolidated clinical summary; physician confirms or amends before submission
-- Integration with Ocean eReferral (Ontario) with PDF fallback
-- Trigger diagnostic testing within the care plan; platform manages requisition, booking, reminders, and result return
-- Follow-up messages to patients; AI monitors care plan and escalates if patient reports deterioration or misses a critical step
-- Results returned with AI structured summary; physician adds final clinical interpretation
-- Results released to patient with physician interpretation layered on top
-- Wearable vitals summary on the episode review (read-only, labeled consumer-grade, shown only when the patient has shared data)
-
-### AI
-
-- Urgency assessment: ROUTINE / SEE SOON / URGENT / EMERGENCY
-- Red-flag detection: exertional chest pain, stroke signs, anaphylaxis, severe breathing difficulty — triggers immediate emergency pathway
-- Clinical summary consolidation: multiple submissions and voice notes compressed into a 30-second physician read
-- Specialty routing suggestion for referrals, drawn from consolidated clinical picture
-- Prescription safety checks: drug interactions, allergy flags, dose-range verification
-- Care plan monitoring: medication pickup confirmation tracking, symptom-update prompts, appointment reminders, deterioration escalation
-- Diagnostic result structuring and summary for physician review
-
----
-
-## Compliance
-
-Designed for PHIPA (Ontario) and PIPEDA compliance from the first migration:
-
-- **Canadian data residency** — all PHI hosted on Canadian infrastructure (Supabase CA regions)
-- **Encryption** — health card and insurance numbers encrypted with AES-256 at the application layer before storage; TLS in transit
-- **Role-based access control** — enforced at the API layer; clinic staff only see their clinic's data
-- **Full audit trail** — every PHI access and state change written to `audit_logs`; rows are immutable and append-only
-- **Versioned consent** — every patient consent event recorded with type, version, timestamp, and IP in `patient_consents`; rows are immutable
-- **AI de-identification** — PHI stripped or tokenized before any data is sent to AI model providers
-- **Clinician-in-the-loop** — every AI urgency assessment requires physician confirmation or override; override logging builds the validation evidence base for future regulatory submissions
-- **Patient-generated data labeled** — consumer wearable data is stored and shown as patient-generated (consumer-grade) with device provenance, consent-gated and informational only; the platform never makes an autonomous clinical determination on it
-
-Health Canada classification: the platform launches as a clinical communication and documentation tool. All clinical decisions (urgency confirmation, referral, prescription, result interpretation) are made by a physician. AI functions requiring device classification (autonomous triage, AI-drafted prescriptions) are Phase 3, pursued through the proper licensing pathway.
-
----
-
-## Branch and PR Strategy
-
-One logical change per branch (`feature/<name>`, `fix/<name>`, or `docs/<name>`), one PR per
-branch, merged to `main` after review. Each change ships with its tests in the same PR. The
-authoritative history is the merged PRs on GitHub.
-
-The POC was built bottom-up: schema → patient and clinic → symptom capture → AI triage →
-physician queue → care plan → prescription, referral, and diagnostic loops → notifications → auth →
-React frontend. Subsequent PRs added voice and photo intake, the patient symptom chat, Ontario
-health-card and physician-credential verification, FHIR R4 lab requisitions, and wearable
-integration.
-
----
-
-## Roadmap
-
-Phase 0 is complete and verified end to end. Three phases remain. The codebase already
-over-delivers on parts of Phases 1–2 — voice + photo intake is live, and the real-adapter seams
-for PrescribeIT, Ocean eReferral, and lab booking are scaffolded behind their fallbacks — so the
-remaining work is increasingly operational and regulatory rather than greenfield engineering.
-
-| Phase | Timeframe | Focus | Status |
-|---|---|---|---|
-| 0 — POC | — | Proven core loop and architecture | ✅ Complete |
-| 1 — Pilot | Months 1–6 | Production build, real clinics on fallback paths | 🚧 In progress |
-| 2 — Integration | Months 6–18 | Live national/provincial rails behind the same workflows | ◻️ Planned |
-| 3 — Intelligence | Months 18+ | Elevated AI through the medical-device licensing pathway | ◻️ Future |
-
-### Phase 1 — Pilot (months 1–6)
-
-Real-world validation on the existing fallback-first build, with no integration prerequisites.
-
-- Production build on the Java/FHIR stack; PHIPA-compliant, Canadian-resident hosting.
-- Secrets and config moved to a managed secret store; security assessment before pilot.
-- Voice transcription and photo intake live. ✅ _(shipped in the POC)_
-- Onboard 2–3 pilot clinics (walk-in networks first) on fallback paths only.
-- Surface the physician-override and outcome instrumentation as a dataset / report.
-
-**Outcome:** real-world validation data, the physician-override dataset, and clinic testimonials.
-
-### Phase 2 — Integration (months 6–18)
-
-Same workflows, faster rails. Each integration is an adapter swap, not a re-architecture — the
-seams already exist behind every fallback.
-
-- PrescribeIT vendor onboarding (e-prescribing).
-- Ocean eReferral (Ontario) for electronic referrals.
-- First laboratory booking + results integration.
-- EMR connectivity via FHIR, read/write where the clinic's system allows.
-- Follow-up and reminder automation at scale.
-- **Structured clarification / eConsult** — a scoped, audited message thread on a referral or
-  requisition so a diagnostic centre or specialist can ask a question (or send advice) without a
-  full visit, with the AI summarizing the thread. Maps onto Ontario eConsult and Ocean messaging.
-- **Wearable / device integration** — the patient connects a watch or phone health source (heart
-  rate, steps, sleep, SpO2) through a wearable aggregator, with manual entry as the fallback. Data
-  lands as labeled FHIR `Observation` resources (patient-generated, consumer-grade provenance),
-  shown as trends in the patient and physician consoles and folded into the AI's physician-facing
-  summary. **Informational only:** the platform displays and summarizes the data for the physician;
-  it never makes an autonomous clinical determination or alert on vitals. Active monitoring with
-  automated clinical escalation is a regulated device function and is sequenced to Phase 3.
-- **Administrative voice outreach** — an AI voice agent for non-clinical calls only (appointment
-  reminders, "results are ready," booking and medication-pickup nudges, "the clinic is trying to
-  reach you"). It speaks clinic-approved scripts, always discloses it is the clinic's automated
-  assistant, always offers a human callback, and immediately routes any clinical cue or emergency
-  to a human or 911. It is a new channel behind the existing notification port, with email and
-  in-app as the fallback. The autonomous, clinical-conversation version is Phase 3.
-
-**Outcome:** the same workflows on faster rails, plus a defensible integration moat.
-
-### Phase 3 — Intelligence (months 18+)
-
-The full original vision, achieved through the approval pathway rather than around it.
-
-- Pursue Health Canada medical-device licensing for elevated AI functions.
-- Autonomous triage assistance and AI-drafted prescriptions under physician review.
-- **Autonomous clinical voice agent** — calls that convey clinical content on the physician's
-  behalf and learn from physician interactions (a learning device function under Health Canada's
-  ML-Enabled Medical Devices guidance). The Phase 2 voice agent is strictly administrative; this is
-  its licensed clinical successor.
-- **Active wearable monitoring** — continuous vitals monitoring with automated clinical escalation,
-  building on the informational wearable feed from Phase 2.
-- Backed by the validation evidence (override logs, outcomes) accumulated from Phase 1 onward.
-
-**Outcome:** the full original vision, licensed and defensible.
+CI runs the same commands on every push and pull request to `main`
+(see `.github/workflows/ci.yml`).
