@@ -5,8 +5,6 @@
 A patient intake and triage app for primary-care clinics: patients report symptoms as they happen,
 and physicians see a queue ordered by urgency instead of booking time.
 
-Demo video: https://www.youtube.com/watch?v=YZbIeKGoZLc
-
 ## What it does
 
 - **Patients** report symptoms as text, a voice note or a photo (upload or camera). Entries for the
@@ -115,3 +113,7 @@ cd frontend && npm ci && npm run lint && npm test && npm run build
 
 CI runs the same commands on every push and pull request to `main`
 (see `.github/workflows/ci.yml`).
+
+## License
+
+MIT. See [LICENSE](LICENSE).
